@@ -1,5 +1,5 @@
 # dbt profile for Dune API connection
-dbt_template:
+entropy_advisors_test:
   target: dev
   outputs:
     dev:
