@@ -29,12 +29,35 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "dbt_packages"
 
 models:
-  dbt_template:
-    # Config indicated by + and applies to all files under models/templates/
-    +materialized: view       # fallback default, materialized should be overriden in model specific configs
-    +view_security: invoker   # required security setting for views
+  entropy_advisors_test:
+    # Global post-hooks apply to all models in this project
     +post-hook:
       - sql: "{{ optimize_table(this, model.config.materialized) }}"
         transaction: true
       - sql: "{{ vacuum_table(this, model.config.materialized) }}"
         transaction: true
+
+    # Utility/dimension models shared across layers
+    utils:
+      +materialized: view
+      +view_security: invoker
+
+    # Template reference models (not for production use)
+    templates:
+      +materialized: view
+      +view_security: invoker   # required security setting for views
+
+    # Staging layer: clean raw source data (bronze)
+    staging:
+      +materialized: view       # default; override to incremental in each model config
+      +view_security: invoker
+
+    # Intermediate layer: business logic and cross-protocol joins (silver)
+    intermediate:
+      +materialized: view       # default; override to incremental in each model config
+      +view_security: invoker
+
+    # Marts layer: final analytics-ready tables (gold)
+    marts:
+      +materialized: table      # default; override in each model config as needed
+      +view_security: invoker

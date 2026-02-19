@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: int_token_hourly_supply
+    description: >
+      Hourly mint/burn aggregation per token per chain, with running circulating supply and market cap.
+      Reads full history of stg_token_mint_burn_events for the cumulative window function.
+      Only recent rows are inserted into the target on incremental runs.
+      Partitioned by blockchain and block_date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - blockchain
+            - hour
+            - token_address
+    columns:
+      - name: hour
+        description: "Truncated to the hour (date_trunc('hour', block_time))"
+        tests:
+          - not_null
+      - name: block_date
+        description: "Date derived from hour (partition column)"
+        tests:
+          - not_null
+      - name: blockchain
+        tests:
+          - not_null
+      - name: token_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: name
+      - name: label
+      - name: category
+      - name: mint_volume
+        description: "Total tokens minted in this hour (decimal-adjusted)"
+      - name: burn_volume
+        description: "Total tokens burned in this hour (decimal-adjusted)"
+      - name: net_change
+        description: "mint_volume - burn_volume"
+      - name: avg_price_usd
+        description: "Average token price over all mint/burn events in this hour"
+      - name: circulating_supply
+        description: "Cumulative running sum of net_change up to and including this hour"
+      - name: market_cap_usd
+        description: "circulating_supply × avg_price_usd"

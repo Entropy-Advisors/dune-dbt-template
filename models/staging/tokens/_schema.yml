@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: stg_token_mint_burn_events
+    description: >
+      Raw mint and burn transfer events for tokens labelled in dim_labels (type = 'token').
+      Mints are transfers FROM the zero address; burns are transfers TO the zero address or dead address.
+      One row per transfer event. No aggregation.
+      Decimal-adjusted amounts and USD values sourced directly from tokens.transfers.
+      Partitioned by blockchain and block_date.
+    columns:
+      - name: blockchain
+        tests:
+          - not_null
+      - name: block_date
+        tests:
+          - not_null
+      - name: block_time
+      - name: block_number
+      - name: tx_hash
+      - name: evt_index
+      - name: from_address
+        description: "0x000...000 for mint events"
+      - name: to_address
+        description: "0x000...000 or 0x000...dead for burn events"
+      - name: token_address
+        tests:
+          - not_null
+      - name: symbol
+        description: "On-chain token symbol from tokens.transfers"
+      - name: amount
+        description: "Decimal-adjusted token amount"
+      - name: amount_usd
+        description: "USD value at time of transfer"
+      - name: price
+        description: "Token price in USD at time of transfer"
+      - name: transfer_type
+        description: "'mint' or 'burn'"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['mint', 'burn']
+      - name: name
+        description: "User-defined display name from dim_labels"
+      - name: label
+        description: "Protocol/issuer from dim_labels"
+      - name: category
+        description: "Asset category from dim_labels"

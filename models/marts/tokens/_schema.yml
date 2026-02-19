@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: fact_token_supply
+    description: >
+      Cross-chain pivot of int_token_hourly_supply. One row per (hour, token) with
+      per-chain and total circulating supply, mint/burn volumes, and market cap.
+      avg_price_usd is coalesced from chains in order: ethereum > base > arbitrum > plasma.
+      total_market_cap_usd = total_circulating_supply × single coalesced price.
+      Partitioned by block_date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - hour
+            - token_address
+    columns:
+      - name: hour
+        tests:
+          - not_null
+      - name: block_date
+        tests:
+          - not_null
+      - name: token_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: name
+      - name: label
+      - name: category
+      - name: ethereum_circulating_supply
+      - name: base_circulating_supply
+      - name: arbitrum_circulating_supply
+      - name: plasma_circulating_supply
+      - name: total_circulating_supply
+      - name: ethereum_mint_volume
+      - name: base_mint_volume
+      - name: arbitrum_mint_volume
+      - name: plasma_mint_volume
+      - name: ethereum_burn_volume
+      - name: base_burn_volume
+      - name: arbitrum_burn_volume
+      - name: plasma_burn_volume
+      - name: avg_price_usd
+        description: "Coalesced price: ethereum > base > arbitrum > plasma"
+      - name: ethereum_market_cap_usd
+      - name: base_market_cap_usd
+      - name: arbitrum_market_cap_usd
+      - name: plasma_market_cap_usd
+      - name: total_market_cap_usd
+        description: "total_circulating_supply × avg_price_usd"

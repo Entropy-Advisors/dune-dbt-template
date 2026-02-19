@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: dim_labels
+    description: >
+      Manual labels and categorizations maintained by Entropy. Each row represents
+      a known address on a specific blockchain with a human-readable name, protocol label,
+      entity type, and category. Used as the whitelist and enrichment source for all
+      downstream models — filter by `type` and/or `category` to scope queries.
+      Add new rows here to expand coverage without touching any other model.
+    columns:
+      - name: blockchain
+        description: "Chain name in lowercase (ethereum, base, arbitrum, plasma, etc.)"
+        tests:
+          - not_null
+      - name: creator
+        description: "Who created this label entry (always 'entropy' for internal labels)"
+        tests:
+          - not_null
+      - name: address
+        description: "Contract or wallet address as VARBINARY hex literal"
+        tests:
+          - not_null
+      - name: name
+        description: "Human-readable display name for the address (e.g. token symbol like 'USDai', 'sUSDai'). Mixed case allowed."
+      - name: label
+        description: "Protocol or issuer identifier in lowercase (e.g. 'usdai', 'tether', 'superstate', 'centrifuge')"
+      - name: type
+        description: "Entity type in lowercase. Current values: 'token'"
+      - name: category
+        description: "Asset category in lowercase. Current values: 'stablecoin', 'yield-bearing-stablecoin', 'rwa'"

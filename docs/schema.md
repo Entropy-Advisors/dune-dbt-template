@@ -32,6 +32,7 @@ root/
 │   ├── templates/                          # Starter templates (reference only, not production models)
 │   ├── utils/                              # Reusable dimension/lookup models
 │   │   └── labels/
+│   │       └── dim_labels.sql              # Manual address labels, categories, and types
 │   ├── staging/                            # Clean and standardize raw source data (bronze layer)
 │   │   ├── core/
 │   │   ├── aave/
@@ -48,7 +49,6 @@ root/
 │       ├── lending/
 │       ├── morpho/
 │       └── prices/
-├── seeds/                                  # Static reference data (CSVs)
 └── tests/                                  # Custom data quality tests
 ```
 
@@ -58,15 +58,25 @@ root/
 
 ### `utils/labels/` — Shared Dimension Tables
 
-Reusable lookup/dimension tables shared across all layers. These enrich downstream models with metadata.
+Manual labels and categorizations maintained by Entropy. Used as the whitelist and enrichment source across all layers — filter by `type` and/or `category` to scope downstream queries.
 
-| Model | Alias | Status | Notes |
-|-------|-------|--------|-------|
-| `dim_addresses.sql` | `dim_addresses` | 📋 | Labelled wallet and contract addresses |
-| `dim_contracts.sql` | `dim_contracts` | 📋 | Contract-specific metadata; consider merging with `dim_addresses` |
-| `dim_tokens.sql` | `dim_tokens` | 📋 | Token symbols, decimals, address lookups |
+| Model | Alias | Materialization | Status | Notes |
+|-------|-------|----------------|--------|-------|
+| `dim_labels.sql` | `dim_labels` | `view` | ✅ | Manual address labels. Columns: `blockchain`, `creator`, `address`, `name`, `label`, `type`, `category` |
 
-> **Open question**: Should `dim_contracts` be merged into `dim_addresses` with a `type` column, or kept separate for clarity?
+**Schema:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `blockchain` | varchar | Chain name, lowercase |
+| `creator` | varchar | Label author (e.g. `entropy`) |
+| `address` | varbinary | Contract or wallet address |
+| `name` | varchar | Display name — mixed case allowed (e.g. `USDai`, `sUSDai`) |
+| `label` | varchar | Protocol/issuer, lowercase (e.g. `usdai`, `superstate`, `centrifuge`) |
+| `type` | varchar | Entity type, lowercase (e.g. `token`) |
+| `category` | varchar | Asset category, lowercase (e.g. `stablecoin`, `yield-bearing-stablecoin`, `rwa`) |
+
+> To add coverage: append rows to `dim_labels.sql`. No other files need changing.
 
 ---
 
@@ -205,19 +215,85 @@ Final analytics-ready tables. These are the models exposed to dashboards, APIs, 
 
 ---
 
+---
+
+## Token Circulating Supply & Market Cap
+
+Models that track the circulating supply and market cap of labelled ERC-20 tokens across Ethereum, Base, Arbitrum, and Plasma.
+
+### Supply Logic
+
+- **Mints** = transfers `FROM` the zero address (`0x000...000`) — new tokens entering circulation
+- **Burns** = transfers `TO` the zero address or dead address (`0x000...dead`) — tokens leaving circulation
+- **Circulating supply** = cumulative running sum of `net_change` (mint − burn) per chain, computed in `int_token_hourly_supply`
+
+### Token Scope
+
+Driven by `dim_labels` filtered to `type = 'token'`. Amounts and prices sourced directly from `tokens.transfers` (decimal-adjusted). To add tokens, append rows to `dim_labels.sql`.
+
+Current tokens: `USDai`, `sUSDai`, `USCC`, `JTRSY`, `JAAA`, `USTB`, `USYC`
+
+### Model Inventory
+
+| Layer | Model | Alias | Materialization | Status | Notes |
+|-------|-------|-------|----------------|--------|-------|
+| Utils | `utils/labels/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + labels/categories |
+| Staging | `staging/tokens/stg_token_mint_burn_events.sql` | `stg_token_mint_burn_events` | `incremental` (delete+insert) | ✅ | Raw mint/burn events only; joined with `dim_labels`; partitioned by `blockchain, block_date` |
+| Intermediate | `intermediate/tokens/int_token_hourly_supply.sql` | `int_token_hourly_supply` | `incremental` (delete+insert) | ✅ | Hourly aggregation per chain: `mint_volume`, `burn_volume`, `circulating_supply`, `market_cap_usd` |
+| Mart | `marts/tokens/fact_token_supply.sql` | `fact_token_supply` | `incremental` (delete+insert) | ✅ | Cross-chain pivot: `{chain}_circulating_supply`, `{chain}_market_cap_usd`, `total_*` columns |
+
+### Lineage
+
+```
+dim_labels (type = 'token')
+        │
+        ▼ (inner join)
+tokens.transfers (Dune source)
+        │
+        ▼ (filter to mints/burns only)
+stg_token_mint_burn_events     ← raw mint/burn events, one row per transfer
+        │
+        ▼ (hourly aggregation + cumulative supply window)
+int_token_hourly_supply        ← hourly per-chain: supply, market cap, volumes
+        │
+        ▼ (cross-chain pivot)
+fact_token_supply              ← one row per (hour, token): {chain}_* + total_* columns
+```
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Token scope | `dim_labels` filtered to `type = 'token'` | Single source of truth; extend by adding rows |
+| Amounts / prices | Use `tokens.transfers` directly (`amount`, `price`) | Decimal-adjusted, no manual handling needed |
+| `tokens.transfers` not re-materialized | Joined at query time in staging | Already a curated Dune table; re-materializing all transfers adds cost with no benefit |
+| Granularity | Hourly | Right balance between freshness and table size |
+| Circulating supply | `sum(net_change) over (... order by hour)` in intermediate | Full history read ensures correct cumulative sum; staging is small (mints/burns only) |
+| Price per hour | `avg(price)` across mint/burn events in the hour | Simple and fast; sufficient precision |
+| Cross-chain total market cap | `total_circulating_supply × coalesced single price` | Avoids double-counting price variation across chains |
+| Burn addresses | Zero (`0x000...000`) + dead (`0x000...dead`) | Covers both common burn patterns |
+
+### Open Questions
+
+| # | Question | Status |
+|---|----------|--------|
+| 1 | Should we add a `fact_token_holders` model (hourly unique holder count)? | ❓ Open |
+| 2 | If price data is sparse for some tokens/chains, should we forward-fill prices? | ❓ Open |
+
+---
+
 ## Open Questions & Design Decisions
 
 Track architectural decisions and open questions here. Once resolved, document the decision and rationale.
 
 | # | Question | Status | Decision |
 |---|----------|--------|---------|
-| 1 | Should `dim_contracts` be merged into `dim_addresses`? | ❓ Open | — |
-| 2 | What are the exact Fluid decoded source tables in Dune? | ❓ Open | — |
-| 3 | Should Morpho vault logic live in `marts/morpho/` or `marts/lending/`? | ❓ Open | — |
-| 4 | Should `fluid_operates` be split into separate deposit/borrow/etc. models, or kept as one? | ❓ Open | — |
-| 5 | What is the preferred materialization for staging models — `view` or `incremental`? | ❓ Open | — |
-| 6 | Should price models prefer Chainlink oracle prices, DEX-derived prices, or a blended approach? | ❓ Open | — |
-| 7 | Do any marts need multi-chain support (e.g., Arbitrum, Base) from the start, or Ethereum-only first? | ❓ Open | — |
+| 1 | What are the exact Fluid decoded source tables in Dune? | ❓ Open | — |
+| 2 | Should Morpho vault logic live in `marts/morpho/` or `marts/lending/`? | ❓ Open | — |
+| 3 | Should `fluid_operates` be split into separate deposit/borrow/etc. models, or kept as one? | ❓ Open | — |
+| 4 | What is the preferred materialization for staging models — `view` or `incremental`? | ❓ Open | — |
+| 5 | Should price models prefer Chainlink oracle prices, DEX-derived prices, or a blended approach? | ❓ Open | — |
+| 6 | Do any marts need multi-chain support (e.g., Arbitrum, Base) from the start, or Ethereum-only first? | ❓ Open | — |
 
 ---
 
