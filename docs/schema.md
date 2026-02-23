@@ -238,24 +238,32 @@ Current tokens: `USDai`, `sUSDai`, `USCC`, `JTRSY`, `JAAA`, `USTB`, `USYC`
 | Layer | Model | Alias | Materialization | Status | Notes |
 |-------|-------|-------|----------------|--------|-------|
 | Utils | `utils/labels/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + labels/categories + `start_block` per chain |
-| Mart | `marts/tokens/fact_token_supply.sql` | `fact_token_supply` | `table` | ✅ | Full supply + cumulative columns + market cap |
+| Staging | `staging/tokens/stg_token_mint_burn_events.sql` | `stg_token_mint_burn_events` | `incremental` (delete+insert) | ✅ | Raw mint/burn rows with `transfer_type`; one row per transfer |
+| Intermediate | `intermediate/tokens/int_token_hourly_supply.sql` | `int_token_hourly_supply` | `table` | ✅ | Hourly aggregation + gap-fill via `utils.hours` + cumulative supply columns |
+| Mart | `marts/tokens/fact_token_supply.sql` | `fact_token_supply` | `table` | ✅ | Adds `prices.hour` join and `market_cap`; applies `initcap` on blockchain |
 
 ### Lineage
 
 ```
 dim_labels (start_block)
         │
-        ▼ (join on contract_address + blockchain, filter block_number >= start_block)
+        ▼ (join, filter block_number >= start_block)
 tokens.transfers (mints/burns only)
         │
-        ▼ (aggregate to hourly)
+        ▼ raw rows + transfer_type column
+stg_token_mint_burn_events
+        │
+        ▼ aggregate to hourly
 supplies CTE  ──────────────────────────┐
         │                               │ left join
-        ▼ min(date) per token+chain     │
-utils.hours (cross join → fill all hours)
+        ▼ cross join from min(date)     │
+utils.hours (gap-fill all hours) ───────┘
+        │ + cumulative window functions
+        ▼
+int_token_hourly_supply  ← date, blockchain, circulating_supply, ...
         │
-        ▼ left join supplies + prices.hour
-fact_token_supply  ← date, blockchain, symbol, circulating_supply, market_cap, ...
+        ▼ left join prices.hour + initcap(blockchain)
+fact_token_supply        ← + price, market_cap
 ```
 
 ### Design Decisions
@@ -263,11 +271,12 @@ fact_token_supply  ← date, blockchain, symbol, circulating_supply, market_cap,
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | `start_block` filter | Join condition `block_number >= l.start_block` | Skips pre-deployment blocks; improves scan performance |
+| `transfer_type` column | `'mint'` / `'burn'` in staging | Makes downstream aggregation readable with `CASE WHEN transfer_type = 'mint'` |
 | Gap-filling | `utils.hours` cross-joined with `min(date)` from `supplies` | Generates all hours from first transfer; no hardcoded start dates needed |
-| Cumulative columns | Window functions in `summary` CTE | `mint_volume_cumulative`, `burn_volume_cumulative`, `circulating_supply` all computed in one pass |
-| Prices | Left join `prices.hour` on `(timestamp, blockchain, contract_address)` | Isolated join — easy to swap price source |
-| Blockchain casing | `initcap(blockchain)` | Title-case output (e.g. "Ethereum", "Base") |
-| Burn address | Zero address only (`0x000...000`) | Matches source query exactly |
+| Cumulative columns | Window functions in intermediate | `mint_volume_cumulative`, `burn_volume_cumulative`, `circulating_supply` |
+| Prices isolated to mart | Left join `prices.hour` only in `fact_token_supply` | Swap price source by changing one CTE without touching supply logic |
+| Blockchain casing | `initcap(blockchain)` applied in mart after price join | Avoids casing mismatch on the `prices.hour` join |
+| Burn address | Zero address only (`0x000...000`) | Matches working query exactly |
 
 ### Open Questions
 

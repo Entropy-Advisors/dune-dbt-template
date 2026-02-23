@@ -6,14 +6,7 @@
 }}
 
 select
-    blockchain,
-    creator,
-    address,
-    name,
-    label,
-    type,
-    category,
-    start_block
+    *
 from (
     values
         -- USDai

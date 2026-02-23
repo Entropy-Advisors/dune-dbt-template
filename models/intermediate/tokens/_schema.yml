@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: int_token_hourly_supply
+    description: >
+      Hourly supply aggregation per token per chain with gap-filled time series and cumulative columns.
+      Hours are generated via utils.hours cross-joined from each token's first transfer.
+      No prices or market cap — those are added in fact_token_supply.
+    columns:
+      - name: date
+        description: "Hour-truncated timestamp"
+        tests:
+          - not_null
+      - name: blockchain
+        tests:
+          - not_null
+      - name: contract_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: mint_volume
+        description: "Tokens minted in this hour (NULL for gap-filled hours)"
+      - name: burn_volume
+        description: "Tokens burned in this hour (NULL for gap-filled hours)"
+      - name: net_change
+        description: "mint_volume - burn_volume (NULL for gap-filled hours)"
+      - name: mint_volume_cumulative
+        description: "Running cumulative mints up to this hour"
+      - name: burn_volume_cumulative
+        description: "Running cumulative burns up to this hour"
+      - name: circulating_supply
+        description: "Running cumulative net_change (mints - burns) up to this hour"
