@@ -1,88 +1,103 @@
 {{
     config(
         alias = 'fact_token_supply',
-        materialized = 'incremental',
-        incremental_strategy = 'delete+insert',
-        unique_key = ['hour', 'token_address'],
-        properties = {
-            "partitioned_by": "ARRAY['block_date']"
-        }
+        materialized = 'table'
     )
 }}
 
--- Cross-chain pivot of int_token_hourly_supply.
--- One row per (hour, token) with per-chain and total supply/market cap columns.
--- Chains: ethereum, base, arbitrum, plasma.
---
--- avg_price_usd: coalesced from chains in order of liquidity depth.
--- total_market_cap_usd: total_circulating_supply × single coalesced price.
+with labels as (
 
-with hourly_supply as (
+    select
+        blockchain,
+        address         as contract_address,
+        start_block
+    from
+        {{ ref('dim_labels') }}
+    where
+        type = 'token'
 
-    select * from {{ ref('int_token_hourly_supply') }}
+),
+
+transfers as (
+
+    select
+        t.block_time,
+        t.blockchain,
+        t.contract_address,
+        t.symbol,
+        case when t."from" = 0x0000000000000000000000000000000000000000 then t.amount else 0.0 end as mint_amount,
+        case when t."to" = 0x0000000000000000000000000000000000000000 then t.amount else 0.0 end as burn_amount
+    from
+        {{ source('tokens', 'transfers') }} as t
+        join labels as l on t.contract_address = l.contract_address
+            and t.blockchain = l.blockchain
+    where
+        t.block_number >= l.start_block
+        and (t."from" = 0x0000000000000000000000000000000000000000 or t."to" = 0x0000000000000000000000000000000000000000)
+
+),
+
+supplies as (
+
+    select
+        date_trunc('hour', block_time)          as date,
+        blockchain,
+        contract_address,
+        symbol,
+        sum(mint_amount)                        as mint_volume,
+        sum(burn_amount)                        as burn_volume,
+        sum(mint_amount) - sum(burn_amount)     as net_change
+    from
+        transfers
+    group by
+        1, 2, 3, 4
+
+),
+
+dates as (
+
+    select
+        timestamp                               as date,
+        blockchain,
+        contract_address,
+        symbol
+    from
+        {{ source('utils', 'hours') }}
+        cross join (select blockchain, contract_address, symbol, min(date) as start_date from supplies group by 1, 2, 3)
+    where
+        timestamp >= start_date
+
+),
+
+summary as (
+
+    select
+        d.date,
+        initcap(d.blockchain)                   as blockchain,
+        d.contract_address,
+        d.symbol,
+        p.price,
+        s.mint_volume,
+        s.burn_volume,
+        s.net_change,
+        sum(coalesce(s.mint_volume, 0)) over (partition by d.blockchain, d.contract_address order by d.date) as mint_volume_cumulative,
+        sum(coalesce(s.burn_volume, 0)) over (partition by d.blockchain, d.contract_address order by d.date) as burn_volume_cumulative,
+        sum(coalesce(s.net_change, 0)) over (partition by d.blockchain, d.contract_address order by d.date) as circulating_supply,
+        sum(coalesce(s.net_change, 0)) over (partition by d.blockchain, d.contract_address order by d.date) * p.price as market_cap
+    from
+        dates as d
+        left join supplies as s
+            on d.date = s.date
+            and d.blockchain = s.blockchain
+            and d.contract_address = s.contract_address
+        left join {{ source('prices', 'hour') }} as p
+            on d.date = p.timestamp
+            and d.blockchain = p.blockchain
+            and d.contract_address = p.contract_address
 
 )
 
 select
-    hour,
-    cast(date_trunc('day', hour) as date)           as block_date,
-    token_address,
-    symbol,
-    name,
-    label,
-    category,
-
-    -- Circulating supply per chain
-    sum(case when blockchain = 'ethereum' then circulating_supply else 0.0 end)     as ethereum_circulating_supply,
-    sum(case when blockchain = 'base'     then circulating_supply else 0.0 end)     as base_circulating_supply,
-    sum(case when blockchain = 'arbitrum' then circulating_supply else 0.0 end)     as arbitrum_circulating_supply,
-    sum(case when blockchain = 'plasma'   then circulating_supply else 0.0 end)     as plasma_circulating_supply,
-    sum(circulating_supply)                                                          as total_circulating_supply,
-
-    -- Mint volume per chain
-    sum(case when blockchain = 'ethereum' then mint_volume else 0.0 end)            as ethereum_mint_volume,
-    sum(case when blockchain = 'base'     then mint_volume else 0.0 end)            as base_mint_volume,
-    sum(case when blockchain = 'arbitrum' then mint_volume else 0.0 end)            as arbitrum_mint_volume,
-    sum(case when blockchain = 'plasma'   then mint_volume else 0.0 end)            as plasma_mint_volume,
-
-    -- Burn volume per chain
-    sum(case when blockchain = 'ethereum' then burn_volume else 0.0 end)            as ethereum_burn_volume,
-    sum(case when blockchain = 'base'     then burn_volume else 0.0 end)            as base_burn_volume,
-    sum(case when blockchain = 'arbitrum' then burn_volume else 0.0 end)            as arbitrum_burn_volume,
-    sum(case when blockchain = 'plasma'   then burn_volume else 0.0 end)            as plasma_burn_volume,
-
-    -- Single representative price (most liquid chain first)
-    coalesce(
-        max(case when blockchain = 'ethereum' then avg_price_usd end),
-        max(case when blockchain = 'base'     then avg_price_usd end),
-        max(case when blockchain = 'arbitrum' then avg_price_usd end),
-        max(case when blockchain = 'plasma'   then avg_price_usd end)
-    )                                                                                as avg_price_usd,
-
-    -- Market cap per chain
-    sum(case when blockchain = 'ethereum' then market_cap_usd else 0.0 end)         as ethereum_market_cap_usd,
-    sum(case when blockchain = 'base'     then market_cap_usd else 0.0 end)         as base_market_cap_usd,
-    sum(case when blockchain = 'arbitrum' then market_cap_usd else 0.0 end)         as arbitrum_market_cap_usd,
-    sum(case when blockchain = 'plasma'   then market_cap_usd else 0.0 end)         as plasma_market_cap_usd,
-
-    -- Total market cap: total supply × single coalesced price
-    sum(circulating_supply) * coalesce(
-        max(case when blockchain = 'ethereum' then avg_price_usd end),
-        max(case when blockchain = 'base'     then avg_price_usd end),
-        max(case when blockchain = 'arbitrum' then avg_price_usd end),
-        max(case when blockchain = 'plasma'   then avg_price_usd end)
-    )                                                                                as total_market_cap_usd
-
-from hourly_supply
-
-{%- if is_incremental() %}
-where block_date >= now() - interval '3' day
-{%- endif %}
-
-group by
-    hour,
-    token_address,
-    symbol,
-    name,
-    label,
-    category
+    *
+from
+    summary

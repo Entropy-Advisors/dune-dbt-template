@@ -237,41 +237,37 @@ Current tokens: `USDai`, `sUSDai`, `USCC`, `JTRSY`, `JAAA`, `USTB`, `USYC`
 
 | Layer | Model | Alias | Materialization | Status | Notes |
 |-------|-------|-------|----------------|--------|-------|
-| Utils | `utils/labels/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + labels/categories |
-| Staging | `staging/tokens/stg_token_mint_burn_events.sql` | `stg_token_mint_burn_events` | `incremental` (delete+insert) | ✅ | Raw mint/burn events only; joined with `dim_labels`; partitioned by `blockchain, block_date` |
-| Intermediate | `intermediate/tokens/int_token_hourly_supply.sql` | `int_token_hourly_supply` | `incremental` (delete+insert) | ✅ | Hourly aggregation per chain: `mint_volume`, `burn_volume`, `circulating_supply`, `market_cap_usd` |
-| Mart | `marts/tokens/fact_token_supply.sql` | `fact_token_supply` | `incremental` (delete+insert) | ✅ | Cross-chain pivot: `{chain}_circulating_supply`, `{chain}_market_cap_usd`, `total_*` columns |
+| Utils | `utils/labels/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + labels/categories + `start_block` per chain |
+| Mart | `marts/tokens/fact_token_supply.sql` | `fact_token_supply` | `table` | ✅ | Full supply + cumulative columns + market cap |
 
 ### Lineage
 
 ```
-dim_labels (type = 'token')
+dim_labels (start_block)
         │
-        ▼ (inner join)
-tokens.transfers (Dune source)
+        ▼ (join on contract_address + blockchain, filter block_number >= start_block)
+tokens.transfers (mints/burns only)
         │
-        ▼ (filter to mints/burns only)
-stg_token_mint_burn_events     ← raw mint/burn events, one row per transfer
+        ▼ (aggregate to hourly)
+supplies CTE  ──────────────────────────┐
+        │                               │ left join
+        ▼ min(date) per token+chain     │
+utils.hours (cross join → fill all hours)
         │
-        ▼ (hourly aggregation + cumulative supply window)
-int_token_hourly_supply        ← hourly per-chain: supply, market cap, volumes
-        │
-        ▼ (cross-chain pivot)
-fact_token_supply              ← one row per (hour, token): {chain}_* + total_* columns
+        ▼ left join supplies + prices.hour
+fact_token_supply  ← date, blockchain, symbol, circulating_supply, market_cap, ...
 ```
 
 ### Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Token scope | `dim_labels` filtered to `type = 'token'` | Single source of truth; extend by adding rows |
-| Amounts / prices | Use `tokens.transfers` directly (`amount`, `price`) | Decimal-adjusted, no manual handling needed |
-| `tokens.transfers` not re-materialized | Joined at query time in staging | Already a curated Dune table; re-materializing all transfers adds cost with no benefit |
-| Granularity | Hourly | Right balance between freshness and table size |
-| Circulating supply | `sum(net_change) over (... order by hour)` in intermediate | Full history read ensures correct cumulative sum; staging is small (mints/burns only) |
-| Price per hour | `avg(price)` across mint/burn events in the hour | Simple and fast; sufficient precision |
-| Cross-chain total market cap | `total_circulating_supply × coalesced single price` | Avoids double-counting price variation across chains |
-| Burn addresses | Zero (`0x000...000`) + dead (`0x000...dead`) | Covers both common burn patterns |
+| `start_block` filter | Join condition `block_number >= l.start_block` | Skips pre-deployment blocks; improves scan performance |
+| Gap-filling | `utils.hours` cross-joined with `min(date)` from `supplies` | Generates all hours from first transfer; no hardcoded start dates needed |
+| Cumulative columns | Window functions in `summary` CTE | `mint_volume_cumulative`, `burn_volume_cumulative`, `circulating_supply` all computed in one pass |
+| Prices | Left join `prices.hour` on `(timestamp, blockchain, contract_address)` | Isolated join — easy to swap price source |
+| Blockchain casing | `initcap(blockchain)` | Title-case output (e.g. "Ethereum", "Base") |
+| Burn address | Zero address only (`0x000...000`) | Matches source query exactly |
 
 ### Open Questions
 

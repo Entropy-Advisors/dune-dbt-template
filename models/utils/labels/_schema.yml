@@ -28,4 +28,6 @@ models:
       - name: type
         description: "Entity type in lowercase. Current values: 'token'"
       - name: category
-        description: "Asset category in lowercase. Current values: 'stablecoin', 'yield-bearing-stablecoin', 'rwa'"
+        description: "Asset category in lowercase. Current values: 'stablecoin', 'ybs', 'rwa'"
+      - name: start_block
+        description: "First block number of the token contract on this chain. Used to skip pre-deployment blocks in source queries."

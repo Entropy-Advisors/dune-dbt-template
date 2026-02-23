@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: tokens
+    tables:
+      - name: transfers
+  - name: utils
+    tables:
+      - name: hours
+  - name: prices
+    tables:
+      - name: hour
