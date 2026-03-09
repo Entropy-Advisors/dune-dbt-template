@@ -6,7 +6,6 @@ models:
       Hourly circulating supply and market cap per token per chain.
       All hours from first transfer onward are filled via utils.hours cross join.
       Prices joined from prices.hour on (timestamp, blockchain, contract_address).
-      Blockchain names are title-cased via initcap().
     columns:
       - name: date
         description: "Hour-truncated timestamp"
@@ -15,6 +14,7 @@ models:
       - name: contract_address
         description: "Token contract address"
       - name: symbol
+      - name: category
       - name: price
         description: "Token price in USD from prices.hour"
       - name: mint_volume

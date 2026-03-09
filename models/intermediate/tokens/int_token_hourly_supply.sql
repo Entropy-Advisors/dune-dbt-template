@@ -19,7 +19,7 @@ supplies as (
         sum(case when transfer_type = 'mint' then amount else 0.0 end)
             - sum(case when transfer_type = 'burn' then amount else 0.0 end) as net_change
     from
-        {{ ref('stg_token_mint_burn_events') }}
+        {{ ref('stg_token_mint_burn_events_view') }}
     group by
         1, 2, 3, 4
 ),

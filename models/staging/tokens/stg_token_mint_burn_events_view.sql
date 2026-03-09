@@ -1,12 +1,7 @@
 {{
     config(
-        alias = 'stg_token_mint_burn_events',
-        materialized = 'incremental',
-        incremental_strategy = 'delete+insert',
-        unique_key = ['blockchain', 'block_time'],
-        properties = {
-            "partitioned_by": "ARRAY['blockchain', 'block_time']"
-        }
+        alias = 'stg_token_mint_burn_events_view',
+        materialized = 'view'
     )
 }}
 
@@ -45,6 +40,3 @@ where
         t."from" = 0x0000000000000000000000000000000000000000
         or t."to" = 0x0000000000000000000000000000000000000000
     )
-    {%- if is_incremental() %}
-    and date(t.block_time) >= now() - interval '3' day
-    {%- endif %}

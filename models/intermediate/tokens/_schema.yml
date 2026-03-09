@@ -4,6 +4,7 @@ models:
   - name: int_token_hourly_supply
     description: >
       Hourly supply aggregation per token per chain with gap-filled time series and cumulative columns.
+      Sourced from stg_token_mint_burn_events_view.
       Hours are generated via utils.hours cross-joined from each token's first transfer.
       No prices or market cap — those are added in fact_token_supply.
     columns:

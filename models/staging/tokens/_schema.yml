@@ -1,18 +1,12 @@
 version: 2
 
 models:
-  - name: stg_token_mint_burn_events
+  - name: stg_token_mint_burn_events_view
     description: >
-      Raw mint and burn transfer events for tokens in dim_labels (type = 'token').
-      One row per transfer. No aggregation.
-      Filtered to post-deployment blocks via start_block from dim_labels.
-      Partitioned by blockchain and block_date.
+      View copy of stg_token_mint_burn_events. Same logic without incremental config.
+      Used by int_token_hourly_supply and downstream models.
     columns:
       - name: block_time
-      - name: block_date
-        description: "Partition column"
-        tests:
-          - not_null
       - name: blockchain
         tests:
           - not_null
@@ -20,6 +14,32 @@ models:
         tests:
           - not_null
       - name: symbol
+      - name: category
+      - name: amount
+        description: "Decimal-adjusted token amount from tokens.transfers"
+      - name: transfer_type
+        description: "'mint' (from = 0x0) or 'burn' (to = 0x0)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['mint', 'burn']
+
+  - name: stg_token_mint_burn_events
+    description: >
+      Raw mint and burn transfer events for tokens in dim_labels (type = 'token').
+      One row per transfer. No aggregation.
+      Filtered to post-deployment blocks via start_block from dim_labels.
+      Partitioned by blockchain and block_time.
+    columns:
+      - name: block_time
+      - name: blockchain
+        tests:
+          - not_null
+      - name: contract_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: category
       - name: amount
         description: "Decimal-adjusted token amount from tokens.transfers"
       - name: transfer_type
