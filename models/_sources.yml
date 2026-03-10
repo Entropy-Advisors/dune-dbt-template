@@ -10,3 +10,6 @@ sources:
   - name: prices
     tables:
       - name: hour
+  - name: evms
+    tables:
+      - name: logs

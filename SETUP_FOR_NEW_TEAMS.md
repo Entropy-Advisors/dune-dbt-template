@@ -170,20 +170,22 @@ Verify:
 
 The production workflow is **disabled by default** to prevent automatic runs on new repos.
 
-**When you're ready for hourly production runs:**
+**When you're ready for scheduled production runs:**
 
 Edit `.github/workflows/dbt_prod.yml`:
 ```yaml
 on:
   schedule:
-    - cron: '0 * * * *'  # Uncomment these lines
+    - cron: '0 2 * * *'  # Daily at 02:00 UTC (recommended)
   workflow_dispatch:
 ```
+
+**Recommended cadence: daily.** Pool creation events are infrequent and the 3-day incremental lookback window ensures no gaps. Hourly runs consume credits with no meaningful benefit for this workload.
 
 **Before enabling:**
 - ✅ CI tests are passing
 - ✅ You've tested production runs manually (Actions → dbt prod orchestration → Run workflow)
-- ✅ You understand this will run every hour and consume GitHub Actions minutes
+- ✅ You understand each run will consume Dune credits
 
 ## Troubleshooting
 
@@ -221,6 +223,41 @@ git push origin main
 - ✅ Stay aligned with best practices updates
 
 **Note:** Only merge updates that make sense for your project. Review changes carefully before merging.
+
+## DEX Staging Models
+
+`models/staging/dex/` contains pool creation event models — one per protocol and version (e.g. `stg_uniswap_v3_pool_created`). These are **general-purpose bronze-layer primitives**, not domain-locked to any single use case.
+
+### What they contain
+
+Each model captures one on-chain event type from a tracked factory contract:
+- Pool address, token0, token1, protocol, version, blockchain
+- Block/tx metadata (block_date, block_time, block_number, tx_hash, tx_from)
+- V3 models also include fee tier and tick spacing
+
+### What you can build on top of them
+
+These models are the foundation for any DEX analytics work:
+- **DEX liquidity / TVL** — combine with swap and liquidity-change events
+- **Swap volume analytics** — use pool addresses to filter raw swap events
+- **Price oracle construction** — pool addresses are required to identify which pools to read prices from
+- **Protocol growth analytics** — pool count over time, new chain deployments
+- **Token pair metadata** — which protocols support a given pair, across which chains
+
+### How to add a new protocol
+
+Follow `jobs/NEW_MODEL_CHECKLIST.md`. The pattern is identical for every protocol:
+1. Add factory addresses directly to `dim_dex_factory_addresses.sql` (see Step 6 in `jobs/NEW_MODEL_CHECKLIST.md`)
+2. Create a staging SQL model following the existing pattern
+3. Add an entry to `models/staging/dex/_schema.yml`
+4. Create a job file in `jobs/` for future deployment refreshes
+
+### Scheduler guidance
+
+- Always run `dbt run` (incremental) — **never `--full-refresh` in production**
+- Full refresh is a manual one-off, only needed after adding new factory addresses (to backfill historical events)
+- Daily cadence is sufficient — pool creation events are infrequent and the 3-day lookback window handles any gaps
+- The recommended production schedule is `dbt_prod.yml` — see section 6 above
 
 ## Next Steps
 

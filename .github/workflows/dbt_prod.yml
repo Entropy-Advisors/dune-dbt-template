@@ -1,10 +1,9 @@
 name: dbt prod incremental
 
 on:
-  # schedule:
-  #   - cron: '0 * * * *'  # Run every hour at minute 0
-  # NOTE: Schedule is disabled by default. Uncomment when ready to enable hourly production runs.
-  # Check the README.md to make sure you understand the credit costs associated with running dbt.
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  # NOTE: Check the README.md to make sure you understand the credit costs associated with running dbt.
   workflow_dispatch:  # Allow manual triggers
 
 concurrency:
@@ -14,7 +13,7 @@ concurrency:
 jobs:
   dbt-prod:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
 
     env:
       DUNE_API_KEY: ${{ secrets.DUNE_API_KEY }}
@@ -39,7 +38,8 @@ jobs:
         run: uv run dbt deps
 
       - name: Run models
-        run: uv run dbt run --exclude config.materialized:view # views should only run when modified
+        # Scoped to DEX staging only — expand to --exclude config.materialized:view once all models are production-ready
+        run: uv run dbt run --select staging.dex
 
       - name: Test models
-        run: uv run dbt test --exclude config.materialized:view # views should only be tested when modified
+        run: uv run dbt test --select staging.dex

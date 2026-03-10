@@ -1,0 +1,45 @@
+name: Refresh factory addresses
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # Monthly, 1st of each month at midnight UTC
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run factory address refresh
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: claude --dangerously-skip-permissions "Run the job at jobs/refresh_all_factory_addresses.md"
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add models/utils/factory_addresses/dim_dex_factory_addresses.sql
+          git diff --staged --quiet && echo "No changes to commit" || (
+            git commit -m "chore: refresh factory addresses (monthly)" &&
+            git push
+          )

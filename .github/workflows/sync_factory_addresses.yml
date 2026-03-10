@@ -1,0 +1,36 @@
+name: Sync factory addresses
+
+on:
+  workflow_dispatch:  # Trigger manually after updating the Google Sheet
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Sync factory addresses from Google Sheet
+        run: uv run python scripts/sync_factory_addresses.py --url "https://docs.google.com/spreadsheets/d/e/2PACX-1vQeFuICoQ1AjXrDKBW9E6Yf4PlTHPi1lDDzDAFrONa0otYiwLuX3ujF9S3uF5OWhj1E3ANylQVI_lSe/pub?output=csv"
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add models/utils/factory_addresses/dim_dex_factory_addresses.sql
+          git diff --staged --quiet && echo "No changes to commit" || (
+            git commit -m "chore: sync factory addresses from Google Sheet" &&
+            git push
+          )
