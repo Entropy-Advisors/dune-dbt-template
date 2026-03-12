@@ -44,6 +44,7 @@ logs as (
     where
         -- Initialize(bytes32,address,address,uint24,int24,address,uint160,int24)
         l.topic0 = 0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438
+        and (l.blockchain, l.contract_address) in (select blockchain, contract_address from pool_manager_addresses)
         {%- if is_incremental() %}
         and l.block_date >= cast(now() - interval '3' day as date)
         {%- endif %}

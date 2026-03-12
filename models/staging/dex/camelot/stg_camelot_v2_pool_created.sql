@@ -43,6 +43,7 @@ logs as (
         and l.block_number >= f.min_block_number
     where
         l.topic0 = 0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9
+        and (l.blockchain, l.contract_address) in (select blockchain, contract_address from factory_addresses)
         {%- if is_incremental() %}
         and l.block_date >= cast(now() - interval '3' day as date)
         {%- endif %}
