@@ -150,6 +150,162 @@ See `jobs/GOOGLE_SHEET_WORKFLOW.md` for full documentation of this pattern (usef
 
 ---
 
+## Adding a New Chain or DEX
+
+Both scenarios require `--full-refresh` on `stg_dex_pool_token_transfers` to backfill
+historical transfers for newly covered pools. This is expected — it drops and rebuilds the
+transfer table (~22 minutes). Log each run to `docs/run_log.csv` from `target/run_results.json`
+before running the next command.
+
+### Scenario A: New chain for an existing DEX
+
+Triggered when a protocol you already track (e.g. SushiSwap) deploys on a new blockchain,
+and you've added its factory address to `dim_dex_factory_addresses.sql`.
+
+**Only full-refresh the staging models whose factory addresses changed.** If only SushiSwap
+added a new chain, you don't need to touch Uniswap or PancakeSwap staging.
+
+```bash
+# Step 1: Full-refresh the affected protocol's pool creation staging model(s).
+# This rescans all history for that protocol across all chains — including the new one.
+set -a && source .env && set +a && uv run dbt run \
+  --select stg_sushiswap_v2_pool_created stg_sushiswap_v3_pool_created \
+  --full-refresh
+
+# → Read target/run_results.json, append to docs/run_log.csv before continuing.
+
+# Step 2: Full-refresh the token transfers table.
+# Required because the new chain's pools have no historical transfers loaded yet.
+set -a && source .env && set +a && uv run dbt run \
+  --select stg_dex_pool_token_transfers \
+  --full-refresh
+
+# → Read target/run_results.json, append to docs/run_log.csv before continuing.
+
+# Step 3: Rebuild the mart. Always a full rebuild — no --full-refresh flag needed.
+set -a && source .env && set +a && uv run dbt run \
+  --select fact_dex_pool_token_balance
+
+# → Read target/run_results.json, append to docs/run_log.csv.
+```
+
+### Scenario B: New DEX protocol
+
+Triggered when adding a brand-new protocol (new staging model, new factory addresses,
+new UNION ALL branch in `int_dex_pool_created`).
+
+**Pre-run checklist (before any dbt run):**
+1. Create `models/staging/dex/{protocol}/stg_{protocol}_v2_pool_created.sql` — follow `jobs/NEW_MODEL_CHECKLIST.md`
+2. Add factory address rows to `models/utils/factory_addresses/dim_dex_factory_addresses.sql`
+3. Add the new model as a UNION ALL branch in `models/intermediate/dex/int_dex_pool_created.sql`
+4. Update `accepted_values` for `protocol` in `models/intermediate/dex/_schema.yml` to include the new protocol name
+5. Add a `_schema.yml` entry for the new staging model in its subfolder
+
+```bash
+# Step 1: Run the new pool creation staging model.
+# It's a new table (doesn't exist yet), so is_incremental() = false → full history
+# loads automatically. No --full-refresh flag needed.
+set -a && source .env && set +a && uv run dbt run \
+  --select stg_{protocol}_v2_pool_created   # add other versions if applicable
+
+# → Read target/run_results.json, append to docs/run_log.csv before continuing.
+
+# Step 2: Full-refresh the token transfers table.
+# The new protocol's pools weren't in the previous pool_tokens whitelist, so their
+# historical transfers were never loaded.
+set -a && source .env && set +a && uv run dbt run \
+  --select stg_dex_pool_token_transfers \
+  --full-refresh
+
+# → Read target/run_results.json, append to docs/run_log.csv before continuing.
+
+# Step 3: Rebuild the mart.
+set -a && source .env && set +a && uv run dbt run \
+  --select fact_dex_pool_token_balance
+
+# → Read target/run_results.json, append to docs/run_log.csv.
+```
+
+> **Why --full-refresh on transfers every time?**
+> `stg_dex_pool_token_transfers` is incremental with a 3-day lookback. Without `--full-refresh`,
+> it only scans the last 3 days of `tokens.transfers` — missing all historical data for newly
+> added pools. There is no incremental workaround; accept the ~22-minute rebuild cost.
+
+---
+
+## dbt Schema YAML Conventions
+
+### accepted_values test format (dbt 1.10+)
+
+Always nest `values` under `arguments:`. The flat form is deprecated and causes warnings:
+
+```yaml
+# CORRECT — use this:
+- accepted_values:
+    arguments:
+      values: ['foo', 'bar']
+
+# DEPRECATED — do not use:
+- accepted_values:
+    values: ['foo', 'bar']
+```
+
+`not_null` takes no arguments and needs no wrapper.
+
+### Trino-specific SQL patterns
+
+- `QUALIFY <condition>` filters rows after a window function without a wrapper CTE — supported in Trino. Preferred over wrapping in a subquery.
+  ```sql
+  select ..., sum(...) over (...) as balance
+  from ...
+  qualify balance > 0
+  ```
+
+### Signed amount convention (transfer models)
+
+In transfer staging models (`stg_dex_pool_token_transfers` and future equivalents):
+- `amount`: **signed** — positive for inflow, negative for outflow
+- `amount_usd`: **signed** — same sign convention
+- `amount_raw`: **always positive** — raw on-chain integer, never negated. Only `amount` and `amount_usd` carry the sign.
+
+### Staging folder structure
+
+Protocol-specific staging models live in `models/staging/dex/{protocol}/`, each with their own `_schema.yml`.
+Cross-protocol models (e.g. `stg_dex_pool_token_transfers`) stay in `models/staging/dex/` root.
+New protocols: create a new subfolder, don't add to the root.
+
+---
+
+## Run Documentation
+
+> **Update the CSV immediately after each run — `target/run_results.json` is overwritten on every `dbt run`.**
+>
+> **Never construct log rows from terminal output.** Terminal output does not include `query_id`. Always read `target/run_results.json` as the sole source of truth. If another `dbt run` executes before the log is updated, the file is gone and the query_id is unrecoverable locally (though it may still be visible in app.dune.com/settings/billing).
+
+After every successful `dbt run`, append rows to `docs/run_log.csv`.
+
+### How to populate the log
+
+All data comes from `target/run_results.json` — read it **before** running any other dbt command:
+
+| CSV column | Source |
+|------------|--------|
+| `run_date` | `metadata.invocation_started_at` (date only, UTC) |
+| `run_timestamp` | `metadata.invocation_started_at` (full ISO, UTC) |
+| `target` | the `--target` flag used (dev or prod) |
+| `vars` | the `--vars` JSON passed to dbt, or empty string if none |
+| `model` | `results[n].unique_id` stripped of `model.<profile>.` prefix |
+| `query_id` | `results[n].adapter_response.query_id` |
+| `operation` | `results[n].adapter_response._message` |
+| `rows_affected` | `results[n].adapter_response.rows_affected` |
+| `duration_seconds` | `results[n].execution_time` (round to 2dp) |
+| `credit_cost` | Leave blank — user fills manually from app.dune.com/settings/billing |
+| `notes` | Brief description of the run context (e.g. "first load arbitrum only") |
+
+Only append rows for successful results (`status = "success"`). Skip errors and skips. Log **every** model dbt executed — including utility views (e.g. `dim_dex_factory_addresses`) if they appear in `run_results.json` because the run used a `+` prefix or explicitly selected them. Do not filter by model type.
+
+---
+
 ## Project Overview
 
 See `SETUP_FOR_NEW_TEAMS.md` for full setup instructions.

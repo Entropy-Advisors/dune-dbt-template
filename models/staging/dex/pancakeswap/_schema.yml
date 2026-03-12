@@ -1,0 +1,132 @@
+version: 2
+
+models:
+  - name: stg_pancakeswap_v2_pool_created
+    description: >
+      Decoded PairCreated events from PancakeSwap V2 factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs PancakeSwap V2 pool
+      metadata, swap event filtering, TVL computation, price oracle construction, or protocol analytics.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. bnb, ethereum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address that emitted the PairCreated event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'pancakeswap'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['pancakeswap']
+      - name: version
+        description: "Always '2' for PancakeSwap V2"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['2']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pair/pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pair (lower address)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pair (higher address)"
+        tests:
+          - not_null
+
+  - name: stg_pancakeswap_v3_pool_created
+    description: >
+      Decoded PoolCreated events from PancakeSwap V3 factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs PancakeSwap V3 pool
+      metadata (including fee tier and tick spacing), swap event filtering, TVL computation, or price oracle construction.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. bnb, ethereum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address that emitted the PoolCreated event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'pancakeswap'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['pancakeswap']
+      - name: version
+        description: "Always '3' for PancakeSwap V3"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['3']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pair (lower address)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pair (higher address)"
+        tests:
+          - not_null
+      - name: fee
+        description: "Pool fee tier in hundredths of a basis point (e.g. 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)"
+        tests:
+          - not_null
+      - name: tick_spacing
+        description: "Tick spacing corresponding to the fee tier"
+        tests:
+          - not_null

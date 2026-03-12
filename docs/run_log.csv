@@ -1,0 +1,32 @@
+run_date,run_timestamp,target,vars,model,query_id,operation,rows_affected,duration_seconds,credit_cost,notes
+2026-03-10,2026-03-10T08:29:46Z,dev,,dim_dex_factory_addresses,,CREATE VIEW,0,1.77,,first successful run using dim view approach
+2026-03-10,2026-03-10T08:29:46Z,dev,,stg_uniswap_v2_pool_created,,CREATE TABLE,4632514,227.19,,first successful run using dim view approach
+2026-03-10,2026-03-10T14:07:38Z,dev,,dim_dex_factory_addresses,,CREATE VIEW,0,1.76,,initial uniswap v3 load
+2026-03-10,2026-03-10T14:07:38Z,dev,,stg_uniswap_v3_pool_created,,CREATE TABLE,2607680,545.89,,initial uniswap v3 load
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_camelot_v2_pool_created,01KKDJ6ZH3E8H76TT3T3WV3BZ8,CREATE TABLE,4295,454.89,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_camelot_v3_pool_created,01KKDJ6ZH7HBE044HSJEKHQRHF,CREATE TABLE,1525,222.31,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_gammaswap_pool_created,01KKDJ6ZSYBHQTEVGCP0459498,CREATE TABLE,98,489.19,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_pancakeswap_v2_pool_created,01KKDJ6ZH847SKEZAAEYG4TAHD,CREATE TABLE,2491885,572.14,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_pancakeswap_v3_pool_created,01KKDJDRKE1V55JC39MC5XJV7A,CREATE TABLE,139344,229.51,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_sushiswap_v2_pool_created,01KKDJMRPGGXWHSJNVDW7RHR1V,CREATE TABLE,60766,117.08,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_sushiswap_v3_pool_created,01KKDJMVQFYEB2EX8JPSTVHMY4,CREATE TABLE,17770,170.25,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_uniswap_v2_pool_created,01KKDJPQ90J71K83FGKPJJPW9N,INSERT,10179,30.53,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_uniswap_v3_pool_created,01KKDJQYK7FQYMY8BKPP9NMGS5,INSERT,1155,44.75,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_uniswap_v4_pool_initialized,01KKDJR6QZPQM1F2JJMCJKYKV8,CREATE TABLE,0,20.81,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",int_dex_pool_created,01KKDJT21TK109A8FWRQZY0K9A,CREATE VIEW,0,3.50,,first load arbitrum only
+2026-03-11,2026-03-11T04:24:14Z,dev,"{""target_blockchain"":""arbitrum""}",stg_dex_pool_token_transfers,01KKDJT5BYAYND2N5YKTHJ3QWM,CREATE TABLE,1033727578,468.37,,first load arbitrum only
+2026-03-11,2026-03-11T06:52:27Z,dev,"{""target_blockchain"":""arbitrum""}",stg_dex_pool_token_transfers,01KKDTPCWTEE236K1534J49GPE,CREATE TABLE,1031745029,63.05,,full-refresh with token whitelist + block filter + double cast fix
+2026-03-11,2026-03-11T07:51:19Z,dev,"{""target_blockchain"":""arbitrum""}",stg_dex_pool_token_transfers,01KKDY1YQ0C557SFT1KH5BS6A9,CREATE TABLE,1031771744,73.83,,full-refresh replacing pool_creation_block_number with pool_creation_block_time
+2026-03-11,2026-03-11T08:36:34Z,dev,"{""target_blockchain"":""arbitrum""}",int_dex_pool_daily_net_change,,CREATE VIEW,0,2.35,,first materialisation arbitrum only
+2026-03-11,2026-03-11T08:37:58Z,dev,"{""target_blockchain"":""arbitrum""}",fact_dex_pool_token_balance,01KKE0QK2DSFDT3PBK31X7GRWK,CREATE TABLE,3386234029,225.89,,first load arbitrum only
+2026-03-11,2026-03-11T08:58:28.344229Z,dev,"{""target_blockchain"":""arbitrum""}",fact_dex_pool_token_balance,01KKE1X3WT64WJ09DP2VD12XQ3,CREATE TABLE (88_268_994 rows),88268994,76.42,,fix GROUP BY 1-6→1-7 (add symbol); first successful run after bug fix
+2026-03-11,2026-03-11T09:22:51Z,dev,"{""target_blockchain"":""arbitrum""}",int_dex_pool_daily_net_change,,CREATE VIEW,0,2.83,,refresh stale view to expose pool_creation_block_time
+2026-03-11,2026-03-11T09:24:01Z,dev,"{""target_blockchain"":""arbitrum""}",fact_dex_pool_token_balance,01KKE3BY124PRM1X9J45QPVXGP,CREATE TABLE,2104635146,586.69,,rework: pre-aggregate net_change before joining onto days spine; fix ambiguous day column
+2026-03-11,2026-03-11T09:35:31Z,dev,"{""target_blockchain"":""arbitrum""}",fact_dex_pool_token_balance,01KKE41DNK23B7KN7HNNPV1FQ4,CREATE TABLE,14941006,25.91,,fix pool_tokens SELECT DISTINCT — previous 2.1B rows was cross join explosion from duplicates
+2026-03-11,2026-03-11T10:07:26Z,dev,,stg_gammaswap_pool_created,01KKE5VESX95FYBBST5HMZT46Z,CREATE TABLE,98,679.28,,full-refresh all chains
+2026-03-11,2026-03-11T10:07:26Z,dev,,stg_sushiswap_v2_pool_created,01KKE5VET2P6AY3R2ER2W21C4M,CREATE TABLE,60768,790.56,,full-refresh all chains
+2026-03-11,2026-03-11T10:07:26Z,dev,,stg_sushiswap_v3_pool_created,01KKE6G64DS1X49EGGDC1GQGS7,CREATE TABLE,17778,191.16,,full-refresh all chains
+2026-03-11,2026-03-11T10:07:26Z,dev,,stg_pancakeswap_v3_pool_created,01KKE5VESS0S30VQWGQAAP7QPM,CREATE TABLE,139364,1194.76,,full-refresh all chains
+2026-03-11,2026-03-11T10:07:26Z,dev,,stg_pancakeswap_v2_pool_created,01KKE5VESR256BKK6E6SZ2V0W8,CREATE TABLE,2492337,1436.99,,full-refresh all chains
+2026-03-11,2026-03-11T11:03:43Z,dev,,stg_dex_pool_token_transfers,01KKE92HD6EDRC4HCN55KJMR42,CREATE TABLE,5876310235,1327.79,,full-refresh all chains
+2026-03-11,2026-03-11T11:29:01Z,dev,,fact_dex_pool_token_balance,01KKEAGTBWZSQJFJ6J13NM0K2D,CREATE TABLE,716586889,725.82,,all-chains mart rebuild

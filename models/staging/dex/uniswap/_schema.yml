@@ -1,0 +1,219 @@
+version: 2
+
+models:
+  - name: stg_uniswap_v2_pool_created
+    description: >
+      Decoded PairCreated events from Uniswap V2 factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs Uniswap V2 pool
+      metadata, swap event filtering, TVL computation, price oracle construction, or protocol analytics.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. ethereum, arbitrum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address that emitted the PairCreated event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'uniswap'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['uniswap']
+      - name: version
+        description: "Always '2' for Uniswap V2"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['2']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pair/pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pair (lower address, per Uniswap V2 convention)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pair (higher address)"
+        tests:
+          - not_null
+
+  - name: stg_uniswap_v3_pool_created
+    description: >
+      Decoded PoolCreated events from Uniswap V3 factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs Uniswap V3 pool
+      metadata (including fee tier and tick spacing), swap event filtering, TVL computation, or price oracle construction.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. ethereum, arbitrum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address that emitted the PoolCreated event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'uniswap'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['uniswap']
+      - name: version
+        description: "Always '3' for Uniswap V3"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['3']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pair (lower address)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pair (higher address)"
+        tests:
+          - not_null
+      - name: fee
+        description: "Pool fee tier in hundredths of a basis point (e.g. 500 = 0.05%, 3000 = 0.3%, 10000 = 1%)"
+        tests:
+          - not_null
+      - name: tick_spacing
+        description: "Tick spacing corresponding to the fee tier (e.g. 10 for 500, 60 for 3000, 200 for 10000)"
+        tests:
+          - not_null
+
+  - name: stg_uniswap_v4_pool_initialized
+    description: >
+      Decoded Initialize events from Uniswap V4 PoolManager contracts across all official deployments.
+      One row per pool initialization event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      V4 key differences from V2/V3: (1) `pool` is a bytes32 PoolId — not a pool contract address;
+      (2) `contract_address` is always the PoolManager (no separate pool contracts exist);
+      (3) `hooks` identifies the hooks contract (zero address if no hooks);
+      (4) `sqrt_price_x96` and `tick` capture initial pool price state at initialization.
+      DO NOT run until min_block_number placeholders (999999999) in dim_dex_factory_addresses.sql are replaced with real values.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was initialized on (e.g. ethereum, arbitrum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "PoolManager contract address — always the same per chain (V4 has no separate pool contracts)"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'uniswap'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['uniswap']
+      - name: version
+        description: "Always '4'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['4']
+      - name: block_date
+        description: "Date of the block containing the Initialize event"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block containing the Initialize event"
+        tests:
+          - not_null
+      - name: block_number
+        description: "Block number of the Initialize event"
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the Initialize event"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the initialize transaction"
+        tests:
+          - not_null
+      - name: pool
+        description: "PoolId (bytes32) — unique identifier for this pool, derived from the pool key (tokens, fee, tickSpacing, hooks). NOT a contract address."
+        tests:
+          - not_null
+      - name: token0
+        description: "currency0 — first token in the pool (lower address)"
+        tests:
+          - not_null
+      - name: token1
+        description: "currency1 — second token in the pool (higher address)"
+        tests:
+          - not_null
+      - name: fee
+        description: "Pool fee in hundredths of a basis point (e.g. 3000 = 0.3%). V4 supports dynamic fees — fee=0 when a dynamic fee hook is used."
+        tests:
+          - not_null
+      - name: tick_spacing
+        description: "Tick spacing for this pool"
+        tests:
+          - not_null
+      - name: hooks
+        description: "Hooks contract address. Zero address (0x000...000) if no hooks are attached."
+        tests:
+          - not_null
+      - name: sqrt_price_x96
+        description: "Initial sqrt price of the pool at initialization, encoded as a Q64.96 fixed-point number"
+        tests:
+          - not_null
+      - name: tick
+        description: "Initial tick of the pool at initialization"
+        tests:
+          - not_null

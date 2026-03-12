@@ -49,6 +49,7 @@ Individual jobs can still be run manually at any time (e.g. after a protocol ann
 | `refresh_sushiswap_v3_deployments.md` | Monthly | Checks for new SushiSwap V3 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_uniswap_v2_deployments.md` | Monthly | Checks for new Uniswap V2 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_uniswap_v3_deployments.md` | Monthly | Checks for new Uniswap V3 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
+| `refresh_uniswap_v4_deployments.md` | Monthly | Checks for new Uniswap V4 PoolManager deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_pancakeswap_v2_deployments.md` | Monthly | Checks for new PancakeSwap V2 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_pancakeswap_v3_deployments.md` | Monthly | Checks for new PancakeSwap V3 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_gammaswap_deployments.md` | Monthly | Checks for new GammaSwap factory deployments and adds them to `dim_dex_factory_addresses.sql` |

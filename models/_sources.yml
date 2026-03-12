@@ -7,6 +7,7 @@ sources:
   - name: utils
     tables:
       - name: hours
+      - name: days
   - name: prices
     tables:
       - name: hour

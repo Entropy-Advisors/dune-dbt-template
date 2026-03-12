@@ -1,0 +1,116 @@
+version: 2
+
+models:
+  - name: int_dex_pool_daily_net_change
+    description: >
+      Daily net token change per (blockchain, pool, token).
+      Aggregates all signed inflows and outflows from stg_dex_pool_token_transfers by day.
+      This is a cheap GROUP BY view — no cumulative logic, no window functions.
+      The running balance is in fact_dex_pool_token_balance (mart).
+    columns:
+      - name: blockchain
+        tests:
+          - not_null
+      - name: day
+        description: "Calendar date (block_date truncated to day)"
+        tests:
+          - not_null
+      - name: pool
+        description: "Pool contract address, or PoolManager address for Uniswap V4"
+        tests:
+          - not_null
+      - name: protocol
+        tests:
+          - not_null
+      - name: version
+        tests:
+          - not_null
+      - name: token_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: pool_creation_block_time
+        description: "Timestamp of pool creation. Passed through from int_dex_pool_created; anchors the days spine in fact_dex_pool_token_balance — spine starts at creation, not first transfer."
+        tests:
+          - not_null
+      - name: net_change
+        description: "Sum of all inflows and outflows for this pool/token on this day. Negative means more left than entered."
+        tests:
+          - not_null
+      - name: net_change_usd
+        description: "USD value of net_change. NULL if price was unavailable at transfer time."
+
+  - name: int_dex_pool_created
+    description: >
+      Union of all DEX pool creation events across all tracked protocols and versions.
+      Each row represents a single pool creation (or initialization) event.
+
+      Protocol coverage: Uniswap V2/V3/V4, SushiSwap V2/V3, PancakeSwap V2/V3,
+      GammaSwap (DeltaSwap), Camelot V2/V3.
+
+      Column notes:
+        - fee / tick_spacing: NULL for V2-style protocols and Camelot V3 (Algebra dynamic fees).
+        - hooks / sqrt_price_x96 / tick: Non-NULL for Uniswap V4 only.
+        - pool: For all protocols except Uniswap V4, this is the pool contract address (varbinary).
+          For Uniswap V4, this is the PoolId (bytes32 hash of the pool key) — not a contract address.
+          Multiple V4 pools can share the same token pair, differentiated by fee/hooks/tick_spacing.
+        - contract_address: For V2/V3, this is the factory contract.
+          For Uniswap V4, this is the PoolManager contract (one per chain).
+    columns:
+      - name: blockchain
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address (V2/V3) or PoolManager address (V4)"
+        tests:
+          - not_null
+      - name: protocol
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['uniswap', 'sushiswap', 'pancakeswap', 'gammaswap', 'camelot']
+      - name: version
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['2', '3', '4', 'deltaswap']
+      - name: pool_creation_block_date
+        tests:
+          - not_null
+      - name: pool_creation_block_time
+        tests:
+          - not_null
+      - name: pool_creation_block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        tests:
+          - not_null
+      - name: tx_from
+        tests:
+          - not_null
+      - name: pool
+        description: >
+          Pool contract address for V2/V3.
+          For Uniswap V4: PoolId (bytes32) — a hash of the pool key (token0, token1, fee, tickSpacing, hooks).
+          Not a contract address; V4 pools do not have their own contracts.
+        tests:
+          - not_null
+      - name: token0
+        tests:
+          - not_null
+      - name: token1
+        tests:
+          - not_null
+      - name: fee
+        description: "Fee tier in hundredths of a bip (e.g. 3000 = 0.3%). NULL for V2 and Camelot V3."
+      - name: tick_spacing
+        description: "Tick spacing for concentrated liquidity pools. NULL for V2 and Camelot V3."
+      - name: hooks
+        description: "Uniswap V4 only. Hooks contract address; 0x000...000 when no hooks are attached. NULL for all other protocols."
+      - name: sqrt_price_x96
+        description: "Uniswap V4 only. Initial sqrt price at pool creation (Q64.96 fixed point). NULL for all other protocols."
+      - name: tick
+        description: "Uniswap V4 only. Initial tick at pool creation. NULL for all other protocols."

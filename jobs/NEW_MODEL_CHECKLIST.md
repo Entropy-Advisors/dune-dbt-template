@@ -37,7 +37,8 @@ e.g. `PairCreated(address,address,address,uint256)`
 
 topic0 = keccak256 of the canonical event signature string.
 
-**Method A — Foundry (recommended if installed):**
+**Always use `cast keccak` first.** It is always installed in this environment (Foundry). Do not attempt Python methods unless `cast` is explicitly unavailable.
+
 ```bash
 cast keccak "EventName(type,type,...)"
 # e.g.
@@ -46,7 +47,7 @@ cast keccak "PoolCreated(address,address,uint24,int24,address)"
 cast keccak "Pool(address,address,address)"
 ```
 
-**Method B — Python (pycryptodome):**
+**Fallback only if `cast` is unavailable — Method B (pycryptodome):**
 ```bash
 python3 -c "
 from Crypto.Hash import keccak
@@ -56,7 +57,7 @@ print('0x' + k.hexdigest())
 "
 ```
 
-**Method C — Python (eth_utils, if installed):**
+**Fallback only if `cast` is unavailable — Method C (eth_utils):**
 ```bash
 python3 -c "from eth_utils import keccak; print(keccak(text='EventName(type,type,...)').hex())"
 ```
@@ -190,10 +191,13 @@ The `is_incremental()` lookback window goes in the `WHERE` clause of the `logs` 
 ```sql
 where
     l.topic0 = 0x<topic0_here>
+    and (l.blockchain, l.contract_address) in (select blockchain, contract_address from factory_addresses)
     {%- if is_incremental() %}
     and l.block_date >= cast(now() - interval '3' day as date)
     {%- endif %}
 ```
+
+The tuple `IN` filter is not redundant with the INNER JOIN — it gives Trino an explicit predicate to push down to the Parquet scan level (partition pruning on `blockchain`, row-group skipping on `contract_address`). The JOIN alone applies after pages are read; the WHERE predicate applies before. Use the tuple form (not two separate `IN` clauses) so only valid `(blockchain, contract_address)` pairs from the factory table are matched.
 
 **Why 3 days, not 1:**
 - **Reorg protection** — blockchain reorganizations can invalidate recent blocks. `delete+insert` on 3 days deletes and re-writes those rows with the correct data. A 1-day window risks keeping stale data from a reorged block.

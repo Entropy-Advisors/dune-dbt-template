@@ -1,0 +1,130 @@
+version: 2
+
+models:
+  - name: stg_camelot_v2_pool_created
+    description: >
+      Decoded PairCreated events from Camelot V2 (Uniswap V2 fork) factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs Camelot V2 pool
+      metadata, swap event filtering, TVL computation, price oracle construction, or protocol analytics.
+    columns:
+      - name: blockchain
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['arbitrum']
+      - name: contract_address
+        description: "Factory contract address that emitted the event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'camelot'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['camelot']
+      - name: version
+        description: "Always '2'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['2']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pair/pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pair (lower address, per Uniswap V2 convention)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pair (higher address)"
+        tests:
+          - not_null
+
+  - name: stg_camelot_v3_pool_created
+    description: >
+      Decoded Pool events from Camelot V3 (Algebra Finance V1.9) factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Uses Pool(address,address,address) event — NOT the Uniswap V3 PoolCreated event.
+      No fee or tick_spacing columns (Algebra Finance uses dynamic directional fees).
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs Camelot V3 pool
+      metadata, swap event filtering, TVL computation, or price oracle construction.
+    columns:
+      - name: blockchain
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['arbitrum']
+      - name: contract_address
+        description: "Factory contract address that emitted the event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'camelot'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['camelot']
+      - name: version
+        description: "Always '3'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['3']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pool (indexed in event)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pool (indexed in event)"
+        tests:
+          - not_null

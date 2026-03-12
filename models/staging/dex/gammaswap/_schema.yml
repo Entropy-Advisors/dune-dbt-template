@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: stg_gammaswap_pool_created
+    description: >
+      Decoded PairCreated events from GammaSwap factory contracts across all official deployments.
+      One row per pool creation event. No aggregation.
+      Factory addresses sourced from `dim_dex_factory_addresses.sql`.
+      Partitioned by blockchain and block_date.
+      Bronze-layer pool registry primitive — ref() this from any model that needs GammaSwap/DeltaSwap
+      pool metadata, swap event filtering, TVL computation, or protocol analytics.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. ethereum, arbitrum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address that emitted the PairCreated event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'gammaswap'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['gammaswap']
+      - name: version
+        description: "Always 'deltaswap' — DeltaSwap is the DEX/AMM layer within GammaSwap"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['deltaswap']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Address of the newly created pair/pool contract"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token in the pair (lower address, per Uniswap V2 convention)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token in the pair (higher address)"
+        tests:
+          - not_null

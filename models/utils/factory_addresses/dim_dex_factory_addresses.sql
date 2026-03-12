@@ -45,6 +45,24 @@ from (
         ('uniswap', '3', 'monad', 0x204faca1764b154221e35c0d20abb3c525710498, 32036467),
         ('uniswap', '3', 'megaeth', 0x3a5f0cd7d62452b7f899b2a5758bfa57be0de478, 32036467),
 
+        -- Uniswap V4
+        -- PoolManager contracts (one per chain — V4 has no separate factory)
+        
+        ('uniswap', '4', 'ethereum',    0x000000000004444c5dc75cB358380D2e3dE08A90, 21688545),
+        ('uniswap', '4', 'unichain',    0x1f98400000000000000000000000000000000004, 25565),
+        ('uniswap', '4', 'optimism',    0x9a13f98cb987694c9f086b1f5eb990eea8264ec3, 130990676),
+        ('uniswap', '4', 'base',        0x498581ff718922c3f8e6a244956af099b2652b2b, 25352561),
+        ('uniswap', '4', 'arbitrum',    0x360e68faccca8ca495c1b759fd9eee466db9fb32, 298076243),
+        ('uniswap', '4', 'polygon',     0x67366782805870060151383f4bbff9dab53e5cd6, 67012640),
+        ('uniswap', '4', 'blast',       0x1631559198a9e474033433b2958dabc135ab6446, 14465585),
+        ('uniswap', '4', 'zora',        0x0575338e4c17006ae181b47900a84404247ca30f, 25523641),
+        ('uniswap', '4', 'worldchain',  0xb1860d529182ac3bc1f51fa2abd56662b7d13f33, 9125449),
+        ('uniswap', '4', 'avalanche_c', 0x06380c0e0912312b5150364b9dc4542ba0dbbc85, 56211242),
+        ('uniswap', '4', 'bnb',         0x28e2ea090877bf75740558f6bfb36a5ffee9e9df, 46001486),
+        ('uniswap', '4', 'celo',        0x288dc841A52FCA2707c6947B3A777c5E56cd87BC, 48818694),
+        ('uniswap', '4', 'monad',       0x188d586ddcf52439676ca21a244753fa19f9ea8e, 30255261),
+        ('uniswap', '4', 'megaeth',     0xacb7e78fa05d562e0a5d3089ec896d57d057d38e, 8097067),
+
         -- Sushiswap V2
         ('sushiswap', '2', 'arbitrum', 0xc35DADB65012eC5796536bD9864eD8773aBc74C4, 70),
         ('sushiswap', '2', 'arbitrum_nova', 0xc35DADB65012eC5796536bD9864eD8773aBc74C4, 721),

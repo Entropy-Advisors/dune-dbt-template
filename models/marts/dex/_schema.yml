@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: fact_dex_pool_token_balance
+    description: >
+      Daily token balance per (blockchain, pool, token).
+      Built from a gap-filled days spine cross-joined with all observed (pool, token) pairs,
+      accumulated with a running sum of daily net changes.
+
+      Only rows where balance > 0 are included — fully drained pools are excluded.
+
+      Materialized as a table because the days spine cross-join and cumulative window function
+      are too expensive to recompute on every query.
+
+      To get TVL, join token_address to a price table (e.g. prices.usd_daily) on (blockchain, token_address, day).
+    columns:
+      - name: day
+        description: "Calendar date"
+        tests:
+          - not_null
+      - name: blockchain
+        tests:
+          - not_null
+      - name: pool
+        description: "Pool contract address (or PoolManager address for Uniswap V4)"
+        tests:
+          - not_null
+      - name: protocol
+        tests:
+          - not_null
+      - name: version
+        tests:
+          - not_null
+      - name: token_address
+        description: "Contract address of the token held in the pool"
+        tests:
+          - not_null
+      - name: symbol
+        description: "Token symbol"
+      - name: net_change
+        description: "Net token change on this day (NULL for gap-filled days with no transfers)"
+      - name: net_change_usd
+        description: "USD value of net_change. NULL on gap-filled days or if price was unavailable."
+      - name: balance
+        description: >
+          Running cumulative token balance up to and including this day.
+          Always > 0 (rows with zero or negative balance are excluded).
+        tests:
+          - not_null

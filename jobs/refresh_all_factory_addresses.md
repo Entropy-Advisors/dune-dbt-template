@@ -12,13 +12,14 @@ Run each of the following jobs in order. For each one, follow its instructions f
 
 1. `jobs/refresh_uniswap_v2_deployments.md`
 2. `jobs/refresh_uniswap_v3_deployments.md`
-3. `jobs/refresh_sushiswap_v2_deployments.md`
-4. `jobs/refresh_sushiswap_v3_deployments.md`
-5. `jobs/refresh_pancakeswap_v2_deployments.md`
-6. `jobs/refresh_pancakeswap_v3_deployments.md`
-7. `jobs/refresh_gammaswap_deployments.md`
-8. `jobs/refresh_camelot_v2_deployments.md`
-9. `jobs/refresh_camelot_v3_deployments.md`
+3. `jobs/refresh_uniswap_v4_deployments.md`
+4. `jobs/refresh_sushiswap_v2_deployments.md`
+5. `jobs/refresh_sushiswap_v3_deployments.md`
+6. `jobs/refresh_pancakeswap_v2_deployments.md`
+7. `jobs/refresh_pancakeswap_v3_deployments.md`
+8. `jobs/refresh_gammaswap_deployments.md`
+9. `jobs/refresh_camelot_v2_deployments.md`
+10. `jobs/refresh_camelot_v3_deployments.md`
 
 All edits go to the same file: `models/utils/factory_addresses/dim_dex_factory_addresses.sql`.
 
