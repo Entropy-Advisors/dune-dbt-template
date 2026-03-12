@@ -10,3 +10,6 @@ sources:
   - name: prices
     tables:
       - name: hour
+  - name: morpho_blue_multichain
+    tables:
+      - name: morphoblue_evt_createmarket
