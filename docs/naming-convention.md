@@ -7,8 +7,8 @@
 | `block_time`, `evt_block_time` | `block_time` |
 | `tx_hash`, `hash`, `evt_tx_hash` | `tx_hash` |
 | `block_number`, `height` | `block_number` |
-| `from`, `sender` | `from` |
-| `to`, `recipient` | `to` |
+| `from` | `from_address` |
+| `to` | `to_address` |
 
 ---
 
@@ -16,9 +16,9 @@
 
 | Grain | Column Name |
 |---|---|
-| Daily | `day` |
-| Hourly | `hour` |
-| Minutely | `minute` |
+| Daily | `date` |
+| Hourly | `date` |
+| Minutely | `date` |
 
 ---
 
@@ -28,7 +28,7 @@
 |---|---|
 | `amount_raw` | Non-decimal-adjusted amount |
 | `amount` | Decimal-adjusted amount |
-| `usd_amount` | USD value at time of event |
+| `amount_usd` | USD value at time of event |
 
 ---
 
@@ -37,13 +37,13 @@
 | Column | Description |
 |---|---|
 | `{metric}` | Decimal-adjusted native token amount |
-| `usd_{metric}` | USD equivalent of the metric |
+| `{metric}_usd` | USD equivalent of the metric |
 
 **Examples:**
-- `volume` / `usd_volume`
-- `fee` / `usd_fee`
-- `interest` / `usd_interest`
-- `cost_basis` / `usd_cost_basis`
+- `volume` / `volume_usd`
+- `fee` / `fee_usd`
+- `interest` / `interest_usd`
+- `cost_basis` / `cost_basis_usd`
 
 ---
 
