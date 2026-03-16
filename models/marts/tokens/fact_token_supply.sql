@@ -20,7 +20,7 @@ select
     s.circulating_supply,
     s.circulating_supply * p.price as market_cap
 from
-    {{ ref('int_token_hourly_supply') }} as s
-    left join {{ source('prices', 'hour') }} as p on s.date = p.timestamp
+    {{ ref('int_token_daily_supply') }} as s
+    left join {{ source('prices', 'day') }} as p on s.date = p.day
         and s.blockchain = p.blockchain
         and s.contract_address = p.contract_address

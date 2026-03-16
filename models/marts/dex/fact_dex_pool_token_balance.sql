@@ -27,7 +27,7 @@ pool_tokens as (
         version,
         token_address,
         symbol,
-        pool_creation_block_time
+        min_block_time
     from {{ ref('int_dex_pool_daily_net_change') }}
 ),
 
@@ -43,7 +43,7 @@ index as (
         pt.symbol
     from {{ source('utils', 'days') }} as d
     cross join pool_tokens as pt
-    where d.timestamp >= pt.pool_creation_block_time
+    where d.timestamp >= pt.min_block_time
 ),
 
 -- Join net changes onto the gap-filled index (NULL for days with no transfers).

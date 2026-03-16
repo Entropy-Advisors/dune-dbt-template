@@ -3,29 +3,95 @@ version: 2
 models:
   - name: stg_token_mint_burn_events
     description: >
-      Raw mint and burn transfer events for tokens in dim_labels (type = 'token').
-      One row per transfer. No aggregation.
-      Filtered to post-deployment blocks via start_block from dim_labels.
-      Partitioned by blockchain and block_date.
+      Raw mint and burn transfer events for tokens whitelisted in `dim_labels` (type = 'token').
+      One row per transfer event. No aggregation.
+
+      Fed by: `tokens.transfers` (source) filtered via inner join + WHERE subquery on `dim_labels`.
+      Feeds into: `int_token_daily_supply`.
+
+      Token whitelist: `dim_labels` (type = 'token') drives which tokens and chains are included.
+      To add a token or chain: add a row to `dim_labels` — no SQL changes needed here.
+
+      Filtered to post-deployment blocks using `min_block_number` from `dim_labels` to skip
+      pre-deployment history. `category` is pulled from `dim_labels` at this layer.
+
+      Signed amount convention: all three amount fields (amount_raw, amount, amount_usd) are signed —
+      positive for mints, negative for burns. This differs from `stg_dex_pool_token_transfers` where
+      `amount_raw` is always positive.
     columns:
-      - name: block_time
-      - name: block_date
-        description: "Partition column"
-        tests:
-          - not_null
       - name: blockchain
+        description: "Chain name in lowercase (e.g. 'arbitrum', 'base', 'plasma')"
         tests:
           - not_null
-      - name: contract_address
-        tests:
-          - not_null
-      - name: symbol
-      - name: amount
-        description: "Decimal-adjusted token amount from tokens.transfers"
-      - name: transfer_type
+      - name: event_type
         description: "'mint' (from = 0x0) or 'burn' (to = 0x0)"
         tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['mint', 'burn']
+      - name: symbol
+        description: "Token symbol from tokens.transfers (e.g. 'USDai', 'sUSDai')"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Token contract address"
+        tests:
+          - not_null
+      - name: category
+        description: "Asset category from dim_labels (e.g. 'stablecoin', 'ybs', 'rwa')"
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the transaction"
+        tests:
+          - not_null
+      - name: tx_to
+        description: "Transaction recipient address"
+        tests:
+          - not_null
+      - name: tx_index
+        description: "Transaction index within the block"
+        tests:
+          - not_null
+      - name: evt_index
+        description: "Log event index within the transaction"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block containing the transfer event"
+        tests:
+          - not_null
+      - name: block_number
+        description: "Block number"
+        tests:
+          - not_null
+      - name: block_date
+        description: "Date of the block (partition column)"
+        tests:
+          - not_null
+      - name: from
+        description: "Sender address (0x0 for mints)"
+      - name: to
+        description: "Recipient address (0x0 for burns)"
+      - name: amount_raw
+        description: >
+          Raw on-chain integer amount, cast to double and signed.
+          Positive for mints, negative for burns.
+          Both stg_token_mint_burn_events and stg_dex_pool_token_transfers sign amount_raw.
+        tests:
+          - not_null
+      - name: amount
+        description: "Decimal-adjusted token amount. Positive for mints, negative for burns."
+        tests:
+          - not_null
+      - name: price
+        description: "Token price in USD at time of event from tokens.transfers (price_usd)"
+      - name: amount_usd
+        description: "USD value of the transfer. Positive for mints, negative for burns."
+        tests:
+          - not_null

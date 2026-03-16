@@ -105,6 +105,19 @@ Follow these rules for every model in this project:
 
 **Promoting an intermediate from view → table:** Just change `materialized = 'incremental'` in the model config. It will automatically be included in the next `dbt_prod.yml` run — no workflow changes needed.
 
+### Bronze Layer Convention (pool_created staging models)
+
+All pool_created staging models are pure decode layers — decode the factory event and store ALL ABI fields exactly as emitted, plus any extracted convenience columns (e.g. individual token addresses from an array field).
+
+Rules:
+- Include ALL fields from `decode_evm_event` in the final SELECT (use snake_case aliases where needed)
+- Keep raw array fields as-is — do not drop them in favour of extracted elements
+- Where an ABI field is an array of token addresses, also extract the individual elements as named columns (e.g. `token0`, `token1`) directly in staging for downstream convenience
+- `protocol`, `version`, `blockchain`, `block_date`, `block_time`, `block_number`, `tx_hash`, `tx_from`, and `contract_address` are always included as partition/join metadata
+- For pools where the address is not in the event: recover `pool` from `evms.creation_traces` — the only acceptable non-decoded column
+
+The intermediate layer (`int_dex_pool_created`) is responsible for null-padding optional columns and normalising protocol-specific field names to the shared schema.
+
 ### Querying models in Dune
 
 | Target | Schema | Query syntax |
@@ -233,6 +246,42 @@ set -a && source .env && set +a && uv run dbt run \
 
 ---
 
+## Token Supply Pipeline
+
+The token mint/burn supply pipeline tracks circulating supply for whitelisted tokens across all chains represented in `dim_labels`.
+
+### Architecture
+
+```
+tokens.transfers (source)
+  └── stg_token_mint_burn_events   [incremental, partitioned by blockchain+block_date]
+        └── int_token_daily_supply  [table — gap-filled daily series, spine from dim_labels]
+              └── fact_token_supply  [table — adds price join from prices.day]
+```
+
+### Token whitelist — `dim_labels`
+
+Both the chain scope and token whitelist are driven by `dim_labels` (type = 'token'). Staging inner-joins to `dim_labels` to filter transfers to whitelisted tokens; the daily spine in `int_token_daily_supply` is built by cross-joining `utils.days` against `dim_labels` using `min_block_time` as the start date.
+
+To add a new token or chain: add a row to `dim_labels` with `type = 'token'`, `min_block_number`, and `min_block_time`, then follow `jobs/NEW_TOKEN_CHAIN_CHECKLIST.md`.
+
+### Materializations (token pipeline)
+
+| Model | Materialization | Reason |
+|-------|----------------|--------|
+| `stg_token_mint_burn_events` | `incremental` (delete+insert, 3-day lookback) | Source is `tokens.transfers` — full scan too expensive |
+| `int_token_daily_supply` | `table` | Gap-fill cross join + window functions; exception to intermediate=view default |
+| `fact_token_supply` | `table` | Final analytics output |
+
+### Signed amount convention for mint/burn staging
+
+`stg_token_mint_burn_events` signs **all three** amount fields (unlike DEX transfer staging):
+- `amount_raw`, `amount`, `amount_usd`: positive = mint, negative = burn
+
+See the full convention table in the "Signed amount convention" section below.
+
+---
+
 ## dbt Schema YAML Conventions
 
 ### accepted_values test format (dbt 1.10+)
@@ -254,25 +303,77 @@ Always nest `values` under `arguments:`. The flat form is deprecated and causes 
 
 ### Trino-specific SQL patterns
 
-- `QUALIFY <condition>` filters rows after a window function without a wrapper CTE — supported in Trino. Preferred over wrapping in a subquery.
+- **`QUALIFY` is NOT supported in Dune's Trino** — Trino treats it as a table alias and errors. Always use a wrapper CTE + `WHERE` instead:
   ```sql
-  select ..., sum(...) over (...) as balance
-  from ...
-  qualify balance > 0
+  with with_balance as (
+      select ..., sum(...) over (...) as balance
+      from ...
+  )
+  select * from with_balance where balance > 0
   ```
 
 ### Signed amount convention (transfer models)
 
-In transfer staging models (`stg_dex_pool_token_transfers` and future equivalents):
+Different staging models use different signing conventions. Refer to the table below:
+
+| Model | `amount_raw` | `amount` | `amount_usd` | Rationale |
+|-------|-------------|----------|-------------|-----------|
+| `stg_dex_pool_token_transfers` | **Signed** (inflow +, outflow −) | Signed (inflow +, outflow −) | Signed | All three fields carry the sign |
+| `stg_token_mint_burn_events` | **Signed** (mint +, burn −) | Signed | Signed | Net supply direction — all three fields carry the sign |
+
+For `stg_dex_pool_token_transfers`:
+- `amount_raw`: **signed** — positive for inflow, negative for outflow (raw on-chain integer, no decimals)
 - `amount`: **signed** — positive for inflow, negative for outflow
 - `amount_usd`: **signed** — same sign convention
-- `amount_raw`: **always positive** — raw on-chain integer, never negated. Only `amount` and `amount_usd` carry the sign.
+
+For `stg_token_mint_burn_events`:
+- All three fields (`amount_raw`, `amount`, `amount_usd`): **signed** — positive for mints, negative for burns
 
 ### Staging folder structure
 
 Protocol-specific staging models live in `models/staging/dex/{protocol}/`, each with their own `_schema.yml`.
 Cross-protocol models (e.g. `stg_dex_pool_token_transfers`) stay in `models/staging/dex/` root.
 New protocols: create a new subfolder, don't add to the root.
+
+---
+
+## Post-Change SQL Audits
+
+After modifying any SQL model, run two audit passes — not one.
+
+### Pass 1: Language audit
+
+Check for stale text: comments, descriptions, or YAML entries that no longer reflect the
+code's scope. Common patterns:
+- Protocol-specific assumptions invalidated by new additions (e.g. "token0 and token1 only",
+  "2-token pools")
+- Column name references that were renamed
+- Description counts that are now wrong (e.g. "14 staging models" after adding a 15th)
+
+### Pass 2: Logic audit
+
+Verify that SQL comments accurately describe what the code *actually does*. A comment can
+use current terminology and still describe behaviour the code never implemented.
+
+**Key checks:**
+
+- **Aggregation claims** — If a comment says "we aggregate", "we deduplicate", or "ensures
+  one row per X", verify the SELECT actually contains a GROUP BY with the correct keys.
+
+- **Fan-out risk** — For any CTE used in a JOIN, verify it produces at most one row per
+  join key. Extra rows silently multiply output — no error is raised. Before touching a
+  CTE that feeds a join, ask: "can multiple source rows share the same join key?" If yes,
+  the CTE must aggregate before use.
+
+- **Filter claims** — If a comment says "filtered to X only", verify the WHERE clause
+  actually enforces that constraint.
+
+- **Nullability claims** — If a column is described as "always non-null for protocol X",
+  verify the staging model for that protocol doesn't conditionally null it.
+
+When asked to "audit downstream impact", "check for stale language", or "review after
+adding a new protocol", always run **both passes**. A language-only audit will miss
+logic bugs where comments describe behaviour the code does not implement.
 
 ---
 

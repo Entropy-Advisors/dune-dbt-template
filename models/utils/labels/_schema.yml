@@ -8,6 +8,20 @@ models:
       entity type, and category. Used as the whitelist and enrichment source for all
       downstream models — filter by `type` and/or `category` to scope queries.
       Add new rows here to expand coverage without touching any other model.
+
+      Fed by: no upstream dbt models — rows are maintained directly in dim_labels.sql.
+      Feeds: `stg_token_mint_burn_events` (primary consumer — joins on blockchain + address
+        where type = 'token', using min_block_number to skip pre-deployment transfers).
+        Also feeds `int_token_daily_supply` (via min_block_time to anchor the daily spine).
+
+      Update path: add a VALUES row to dim_labels.sql for each new (blockchain, address) pair.
+      Required fields: blockchain, creator, address, name, label, type='token', category,
+      min_block_number (deployment block), min_block_time (deployment timestamp).
+      No SQL changes to any downstream model are needed — dim_labels is the sole whitelist.
+
+      Note: RWA-category rows are present in the file but commented out, pending future
+      activation. To enable RWA token tracking, uncomment the relevant rows and supply
+      min_block_number and min_block_time placeholders.
     columns:
       - name: blockchain
         description: "Chain name in lowercase (ethereum, base, arbitrum, plasma, etc.)"
@@ -29,5 +43,7 @@ models:
         description: "Entity type in lowercase. Current values: 'token'"
       - name: category
         description: "Asset category in lowercase. Current values: 'stablecoin', 'ybs', 'rwa'"
-      - name: start_block
+      - name: min_block_number
         description: "First block number of the token contract on this chain. Used to skip pre-deployment blocks in source queries."
+      - name: min_block_time
+        description: "Deployment timestamp of the token contract on this chain. Used as the spine start date in int_token_daily_supply."

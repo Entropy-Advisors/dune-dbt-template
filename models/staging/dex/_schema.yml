@@ -16,6 +16,10 @@ models:
 
       V4 note: Uniswap V4 balance is tracked at the PoolManager level (one contract per chain),
       not per individual pool. This is because V4 pools do not have their own contracts.
+
+      Curve note: Curve pools with 3–8 tokens (tricrypto_ng, stableswap_ng, stableswap_legacy)
+      are fully covered — token2 through token7 are included in the pool_tokens whitelist
+      wherever non-null.
     columns:
       - name: blockchain
         tests:
@@ -52,8 +56,8 @@ models:
       - name: version
         tests:
           - not_null
-      - name: pool_creation_block_time
-        description: "Timestamp of pool creation event. Passed through for future hourly/sub-daily granularity models."
+      - name: min_block_time
+        description: "Timestamp of pool creation event. Used to anchor the days spine in fact_dex_pool_token_balance — spine starts at creation, not first transfer."
         tests:
           - not_null
       - name: token_address
@@ -63,7 +67,7 @@ models:
       - name: symbol
         description: "Token symbol from tokens.transfers"
       - name: amount_raw
-        description: "Transfer amount in raw integer units (no decimals applied)"
+        description: "Transfer amount in raw integer units (no decimals applied). Signed: positive for inflow, negative for outflow."
         tests:
           - not_null
       - name: amount
@@ -75,8 +79,10 @@ models:
       - name: amount_usd
         description: "USD value of the transfer. Positive for inflow, negative for outflow. NULL if price unavailable."
       - name: from_address
+        description: "Sender on the transfer event. For inflows: the depositor/router address. For outflows: the pool contract address (or PoolManager for V4)."
         tests:
           - not_null
       - name: to_address
+        description: "Recipient on the transfer event. For inflows: the pool contract address (or PoolManager for V4). For outflows: the withdrawer/router address."
         tests:
           - not_null

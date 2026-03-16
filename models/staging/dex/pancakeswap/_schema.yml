@@ -3,12 +3,13 @@ version: 2
 models:
   - name: stg_pancakeswap_v2_pool_created
     description: >
+      Full-decode bronze layer. All PairCreated ABI fields decoded and output.
       Decoded PairCreated events from PancakeSwap V2 factory contracts across all official deployments.
       One row per pool creation event. No aggregation.
       Factory addresses sourced from `dim_dex_factory_addresses.sql`.
       Partitioned by blockchain and block_date.
-      Bronze-layer pool registry primitive — ref() this from any model that needs PancakeSwap V2 pool
-      metadata, swap event filtering, TVL computation, price oracle construction, or protocol analytics.
+      Feeds into: `int_dex_pool_created` (UNION ALL branch) and serves as the pool address
+      whitelist for `stg_dex_pool_token_transfers`.
     columns:
       - name: blockchain
         description: "Chain the pool was deployed on (e.g. bnb, ethereum, base)"
@@ -64,12 +65,13 @@ models:
 
   - name: stg_pancakeswap_v3_pool_created
     description: >
+      Full-decode bronze layer. All PoolCreated ABI fields decoded and output (token0, token1, fee, tickSpacing, pool).
       Decoded PoolCreated events from PancakeSwap V3 factory contracts across all official deployments.
       One row per pool creation event. No aggregation.
       Factory addresses sourced from `dim_dex_factory_addresses.sql`.
       Partitioned by blockchain and block_date.
-      Bronze-layer pool registry primitive — ref() this from any model that needs PancakeSwap V3 pool
-      metadata (including fee tier and tick spacing), swap event filtering, TVL computation, or price oracle construction.
+      Feeds into: `int_dex_pool_created` (UNION ALL branch) and serves as the pool address
+      whitelist for `stg_dex_pool_token_transfers`.
     columns:
       - name: blockchain
         description: "Chain the pool was deployed on (e.g. bnb, ethereum, base)"

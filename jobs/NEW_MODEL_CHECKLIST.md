@@ -165,7 +165,7 @@ Copy the closest existing model and update: `alias`, `ref()` model name, `protoc
 Build from the standard config + CTE structure, but change:
 - `topic0` filter value
 - `decode_evm_event` ABI string
-- Final SELECT columns to match what the ABI decodes
+- Final SELECT: output ALL decoded ABI fields. Do NOT filter to just token0/token1. Keep raw array fields (e.g. a `coins` array) in the SELECT — do not drop them. Where an ABI field is an array of token addresses, also extract individual elements as `token0`, `token1`, etc. using safe array access (e.g. `cardinality()` guards for dynamic arrays; zero-address filtering for fixed arrays). Only acceptable non-decoded column: `pool` recovered from `evms.creation_traces` when the pool address is not in the event.
 
 Config block (same for all models):
 ```sql
@@ -213,10 +213,11 @@ The tuple `IN` filter is not redundant with the INNER JOIN — it gives Trino an
 ## Step 9: Update `models/staging/dex/_schema.yml`
 
 Append a new model entry. At minimum include:
-- `name`, `description`
+- `name`, `description` (mention "Full-decode bronze layer — all ABI fields preserved" in the description)
 - `not_null` tests on: `blockchain`, `contract_address`, `protocol`, `version`, `block_date`, `block_time`, `block_number`, `tx_hash`, `pool`, `token0`, `token1`
 - `accepted_values` tests on `protocol` and `version`
-- For V3 models: also document `fee` and `tick_spacing`
+- Document ALL decoded ABI fields as columns (raw arrays included). No `not_null` tests required on raw array columns or on optional extracted tokens (e.g. `token2`, `token3`).
+- For V3 models: `fee` and `tick_spacing` are directly decoded from the event — add `not_null` tests on both.
 
 ---
 

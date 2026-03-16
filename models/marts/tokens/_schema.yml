@@ -3,26 +3,32 @@ version: 2
 models:
   - name: fact_token_supply
     description: >
-      Hourly circulating supply and market cap per token per chain.
-      All hours from first transfer onward are filled via utils.hours cross join.
-      Prices joined from prices.hour on (timestamp, blockchain, contract_address).
-      Blockchain names are title-cased via initcap().
+      Daily circulating supply and market cap per token per chain.
+      All days from deployment onward are gap-filled — quiet days appear with NULL
+      mint/burn/net_change but carry forward cumulative and supply values.
+
+      Fed by: `int_token_daily_supply` (supply columns), `prices.day` (price join).
+      Price join key: (date = day, blockchain, contract_address).
+
+      market_cap = circulating_supply × price. NULL when price is unavailable for that day.
+      blockchain is title-cased via initcap() (e.g. 'Ethereum', 'Base', 'Arbitrum') to match
+      Dune dashboard conventions.
     columns:
       - name: date
-        description: "Hour-truncated timestamp"
+        description: "Day-truncated date"
       - name: blockchain
         description: "Chain name, title-cased (e.g. Ethereum, Base, Arbitrum)"
       - name: contract_address
         description: "Token contract address"
       - name: symbol
       - name: price
-        description: "Token price in USD from prices.hour"
+        description: "Token price in USD from prices.day"
       - name: mint_volume
-        description: "Tokens minted in this hour (NULL for quiet hours)"
+        description: "Tokens minted on this day (NULL for quiet days)"
       - name: burn_volume
-        description: "Tokens burned in this hour (NULL for quiet hours)"
+        description: "Tokens burned on this day (NULL for quiet days)"
       - name: net_change
-        description: "mint_volume - burn_volume (NULL for quiet hours)"
+        description: "mint_volume - burn_volume (NULL for quiet days)"
       - name: mint_volume_cumulative
         description: "Running cumulative mints"
       - name: burn_volume_cumulative

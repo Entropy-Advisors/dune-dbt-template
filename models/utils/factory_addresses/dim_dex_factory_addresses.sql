@@ -168,6 +168,62 @@ from (
         ('camelot', '2', 'arbitrum', 0x6EcCab422D763aC031210895C81787E87B43A652, 35061163),
 
         -- Camelot V3
-        ('camelot', '3', 'arbitrum', 0x1a3c9B1d2F0529D97f2afC5136Cc23e58f1FD35B, 101163738)
+        ('camelot', '3', 'arbitrum', 0x1a3c9B1d2F0529D97f2afC5136Cc23e58f1FD35B, 101163738),
+
+        -- Curve StableSwap NG
+        ('curve', 'stableswap_ng', 'ethereum',    0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf, null),
+        ('curve', 'stableswap_ng', 'polygon',     0x1764ee18e8B3ccA4787249Ceb249356192594585, null),
+        ('curve', 'stableswap_ng', 'fantom',      0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b, null),
+        ('curve', 'stableswap_ng', 'avalanche_c', 0x1764ee18e8B3ccA4787249Ceb249356192594585, null),
+        ('curve', 'stableswap_ng', 'arbitrum',    0x9AF14D26075f142eb3F292D5065EB3faa646167b, null),
+        ('curve', 'stableswap_ng', 'optimism',    0x5eeE3091f747E60a045a2E715a4c71e600e31F6E, null),
+        ('curve', 'stableswap_ng', 'gnosis',      0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8, null),
+        ('curve', 'stableswap_ng', 'celo',        0x1764ee18e8B3ccA4787249Ceb249356192594585, null),
+        ('curve', 'stableswap_ng', 'zksync',      0xFcAb5d04e8e031334D5e8D2C166B08daB0BE6CaE, null),
+        ('curve', 'stableswap_ng', 'base',        0xd2002373543Ce3527023C75e7518C274A51ce712, null),
+        ('curve', 'stableswap_ng', 'mantle',      0x5eeE3091f747E60a045a2E715a4c71e600e31F6E, null),
+        ('curve', 'stableswap_ng', 'kava',        0x1764ee18e8B3ccA4787249Ceb249356192594585, null),
+        ('curve', 'stableswap_ng', 'fraxtal',     0xd2002373543Ce3527023C75e7518C274A51ce712, null),
+
+        -- Curve TwoCrypto NG
+        ('curve', 'twocrypto_ng', 'ethereum',    0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'polygon',     0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'fantom',      0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'avalanche_c', 0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'arbitrum',    0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'optimism',    0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'gnosis',      0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'celo',        0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'zksync',      0xf3a546AF64aFd6BB8292746BA66DB33aFAE72114, null),
+        ('curve', 'twocrypto_ng', 'base',        0xc9Fe0C63Af9A39402e8a5514f9c43Af0322b665F, null),
+        ('curve', 'twocrypto_ng', 'bnb',         0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'fraxtal',     0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+        ('curve', 'twocrypto_ng', 'mantle',      0x98EE851a00abeE0d95D08cF4CA2BdCE32aeaAF7F, null),
+
+        -- Curve Tricrypto NG
+        ('curve', 'tricrypto_ng', 'ethereum',    0x0c0e5f2fF0ff18a3be9b835635039256dC4B4963, null),
+        ('curve', 'tricrypto_ng', 'polygon',     0xC1b393EfEF38140662b91441C6710Aa704973228, null),
+        ('curve', 'tricrypto_ng', 'fantom',      0x9AF14D26075f142eb3F292D5065EB3faa646167b, null),
+        ('curve', 'tricrypto_ng', 'avalanche_c', 0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a, null),
+        ('curve', 'tricrypto_ng', 'arbitrum',    0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8, null),
+        ('curve', 'tricrypto_ng', 'optimism',    0xc6C09471Ee39C7E30a067952FcC89c8922f9Ab53, null),
+        ('curve', 'tricrypto_ng', 'gnosis',      0xb47988aD49DCE8D909c6f9Cf7B26caF04e1445c8, null),
+        ('curve', 'tricrypto_ng', 'kava',        0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a, null),
+        ('curve', 'tricrypto_ng', 'celo',        0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a, null),
+        ('curve', 'tricrypto_ng', 'zksync',      0x5d4174C40f1246dABe49693845442927d5929f0D, null),
+        ('curve', 'tricrypto_ng', 'base',        0xA5961898870943c68037F6848d2D866Ed2016bcB, null),
+        ('curve', 'tricrypto_ng', 'bnb',         0xc55837710bc500F1E3c7bb9dd1d51F7c5647E657, null),
+        ('curve', 'tricrypto_ng', 'fraxtal',     0xc9Fe0C63Af9A39402e8a5514f9c43Af0322b665F, null),
+        ('curve', 'tricrypto_ng', 'mantle',      0x0C9D8c7e486e822C29488Ff51BFf0167B4650953, null),
+
+        -- Curve StableSwap Legacy (pre-NG)
+        ('curve', 'stableswap_legacy', 'ethereum',    0xB9fC157394Af804a3578134A6585C0dc9cc990d4, 12913531),
+        ('curve', 'stableswap_legacy', 'ethereum',    0x0959158b6040d32d04c301a72cbfd6b39e21c9ae, null),  -- MetaPool factory, may have different event; topic0 filter returns 0 rows safely
+        ('curve', 'stableswap_legacy', 'arbitrum',    0xb17b674D9c5CB2e441F8e196a2f048A81355d031, 1428272),
+        ('curve', 'stableswap_legacy', 'avalanche_c', 0xb17b674D9c5CB2e441F8e196a2f048A81355d031, 6635966),
+        ('curve', 'stableswap_legacy', 'optimism',    0x2db0E83599a91b508Ac268a6197b8B14F5e72840, 3497121),
+        ('curve', 'stableswap_legacy', 'polygon',     0x722272d36ef0da72ff51c5a65db7b870e2e8d4ee, 20093387),
+        ('curve', 'stableswap_legacy', 'gnosis',      0xD19Baeadc667Cf2015e395f2B08668Ef120f41F5, 21366595),
+        ('curve', 'stableswap_legacy', 'fantom',      0x686d67265703d1f124c45e33d47d794c566889ba, 17081767)
 
 ) as t(protocol, version, blockchain, contract_address, min_block_number)

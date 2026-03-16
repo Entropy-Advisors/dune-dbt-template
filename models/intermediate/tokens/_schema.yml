@@ -1,14 +1,24 @@
 version: 2
 
 models:
-  - name: int_token_hourly_supply
+  - name: int_token_daily_supply
     description: >
-      Hourly supply aggregation per token per chain with gap-filled time series and cumulative columns.
-      Hours are generated via utils.hours cross-joined from each token's first transfer.
+      Daily supply aggregation per token per chain with gap-filled time series and cumulative columns.
+      Days are generated via utils.days cross-joined from each token's first transfer.
       No prices or market cap — those are added in fact_token_supply.
+
+      Fed by: `stg_token_mint_burn_events` (already filtered to dim_labels whitelist).
+      Token whitelist and start_block filter are applied in staging — not here.
+      category comes directly from the staging model.
+      Feeds: `fact_token_supply`.
+
+      Materialization note: materialized as `table` (exception to the intermediate=view default).
+      The gap-fill cross join (utils.days × distinct tokens) produces a large row set and uses
+      window functions for cumulative columns — keeping this as a view would re-run that work on
+      every downstream query. The table materialization amortizes the cost.
     columns:
       - name: date
-        description: "Hour-truncated timestamp"
+        description: "Day-truncated date"
         tests:
           - not_null
       - name: blockchain
@@ -18,15 +28,17 @@ models:
         tests:
           - not_null
       - name: symbol
+      - name: category
+        description: "Token category from dim_labels (sourced via staging). Always populated, including on gap-filled days."
       - name: mint_volume
-        description: "Tokens minted in this hour (NULL for gap-filled hours)"
+        description: "Tokens minted on this day (NULL for gap-filled days)"
       - name: burn_volume
-        description: "Tokens burned in this hour (NULL for gap-filled hours)"
+        description: "Tokens burned on this day (NULL for gap-filled days)"
       - name: net_change
-        description: "mint_volume - burn_volume (NULL for gap-filled hours)"
+        description: "mint_volume - burn_volume (NULL for gap-filled days)"
       - name: mint_volume_cumulative
-        description: "Running cumulative mints up to this hour"
+        description: "Running cumulative mints up to this day"
       - name: burn_volume_cumulative
-        description: "Running cumulative burns up to this hour"
+        description: "Running cumulative burns up to this day"
       - name: circulating_supply
-        description: "Running cumulative net_change (mints - burns) up to this hour"
+        description: "Running cumulative net_change (mints - burns) up to this day"

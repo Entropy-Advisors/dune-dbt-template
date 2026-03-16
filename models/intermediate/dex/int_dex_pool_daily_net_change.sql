@@ -18,7 +18,7 @@ select
     version,
     token_address,
     symbol,
-    pool_creation_block_time,
+    min_block_time,
     sum(amount)                                         as net_change
 from {{ ref('stg_dex_pool_token_transfers') }}
 group by 1, 2, 3, 4, 5, 6, 7, 8

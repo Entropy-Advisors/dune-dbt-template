@@ -3,12 +3,13 @@ version: 2
 models:
   - name: stg_gammaswap_pool_created
     description: >
+      Full-decode bronze layer. All PairCreated ABI fields decoded and output.
       Decoded PairCreated events from GammaSwap factory contracts across all official deployments.
       One row per pool creation event. No aggregation.
       Factory addresses sourced from `dim_dex_factory_addresses.sql`.
       Partitioned by blockchain and block_date.
-      Bronze-layer pool registry primitive — ref() this from any model that needs GammaSwap/DeltaSwap
-      pool metadata, swap event filtering, TVL computation, or protocol analytics.
+      Feeds into: `int_dex_pool_created` (UNION ALL branch) and serves as the pool address
+      whitelist for `stg_dex_pool_token_transfers`.
     columns:
       - name: blockchain
         description: "Chain the pool was deployed on (e.g. ethereum, arbitrum, base)"

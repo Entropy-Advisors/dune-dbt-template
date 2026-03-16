@@ -11,6 +11,8 @@ sources:
   - name: prices
     tables:
       - name: hour
+      - name: day
   - name: evms
     tables:
       - name: logs
+      - name: creation_traces

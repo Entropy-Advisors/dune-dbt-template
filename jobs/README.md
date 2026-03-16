@@ -55,6 +55,8 @@ Individual jobs can still be run manually at any time (e.g. after a protocol ann
 | `refresh_gammaswap_deployments.md` | Monthly | Checks for new GammaSwap factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_camelot_v2_deployments.md` | Monthly | Checks for new Camelot V2 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_camelot_v3_deployments.md` | Monthly | Checks for new Camelot V3 (Algebra) factory deployments and adds them to `dim_dex_factory_addresses.sql` |
+| `refresh_curve_deployments.md` | Monthly | Checks for new Curve Finance factory deployments (TwoCrypto NG, Tricrypto NG, StableSwap NG, Legacy) and adds them to `dim_dex_factory_addresses.sql` |
+| `NEW_TOKEN_CHAIN_CHECKLIST.md` | On demand | Add a new chain to the token mint/burn supply pipeline |
 
 ## Adding a New Job
 
