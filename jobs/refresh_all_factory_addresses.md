@@ -20,6 +20,10 @@ Run each of the following jobs in order. For each one, follow its instructions f
 8. `jobs/refresh_gammaswap_deployments.md`
 9. `jobs/refresh_camelot_v2_deployments.md`
 10. `jobs/refresh_camelot_v3_deployments.md`
+11. `jobs/refresh_curve_twocrypto_ng_deployments.md`
+12. `jobs/refresh_curve_tricrypto_ng_deployments.md`
+13. `jobs/refresh_curve_stableswap_ng_deployments.md`
+14. `jobs/refresh_curve_stableswap_legacy_deployments.md`
 
 All edits go to the same file: `models/utils/factory_addresses/dim_dex_factory_addresses.sql`.
 

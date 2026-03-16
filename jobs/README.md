@@ -44,7 +44,7 @@ Individual jobs can still be run manually at any time (e.g. after a protocol ann
 
 | File | Frequency | What it does |
 |------|-----------|-------------|
-| `refresh_all_factory_addresses.md` | Monthly (via GH Actions) | Runs all 9 protocol refresh jobs in sequence — this is what the scheduler triggers |
+| `refresh_all_factory_addresses.md` | Monthly (via GH Actions) | Runs all 14 protocol refresh jobs in sequence — this is what the scheduler triggers |
 | `refresh_sushiswap_v2_deployments.md` | Monthly | Checks for new SushiSwap V2 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_sushiswap_v3_deployments.md` | Monthly | Checks for new SushiSwap V3 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_uniswap_v2_deployments.md` | Monthly | Checks for new Uniswap V2 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
@@ -55,7 +55,10 @@ Individual jobs can still be run manually at any time (e.g. after a protocol ann
 | `refresh_gammaswap_deployments.md` | Monthly | Checks for new GammaSwap factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_camelot_v2_deployments.md` | Monthly | Checks for new Camelot V2 factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `refresh_camelot_v3_deployments.md` | Monthly | Checks for new Camelot V3 (Algebra) factory deployments and adds them to `dim_dex_factory_addresses.sql` |
-| `refresh_curve_deployments.md` | Monthly | Checks for new Curve Finance factory deployments (TwoCrypto NG, Tricrypto NG, StableSwap NG, Legacy) and adds them to `dim_dex_factory_addresses.sql` |
+| `refresh_curve_twocrypto_ng_deployments.md` | Monthly | Checks for new Curve TwoCrypto NG factory deployments and adds them to `dim_dex_factory_addresses.sql` |
+| `refresh_curve_tricrypto_ng_deployments.md` | Monthly | Checks for new Curve Tricrypto NG factory deployments and adds them to `dim_dex_factory_addresses.sql` |
+| `refresh_curve_stableswap_ng_deployments.md` | Monthly | Checks for new Curve StableSwap NG factory deployments and adds them to `dim_dex_factory_addresses.sql` |
+| `refresh_curve_stableswap_legacy_deployments.md` | Monthly | Checks for new Curve StableSwap Legacy factory deployments and adds them to `dim_dex_factory_addresses.sql` |
 | `NEW_TOKEN_CHAIN_CHECKLIST.md` | On demand | Add a new chain to the token mint/burn supply pipeline |
 
 ## Adding a New Job
