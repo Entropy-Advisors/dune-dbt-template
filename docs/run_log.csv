@@ -1,4 +1,17 @@
 run_date,run_timestamp,target,vars,model,query_id,operation,rows_affected,duration_seconds,credit_cost,notes
+2026-03-16,2026-03-16T13:15:53Z,dev,,int_token_holder_daily_net_change,01KKVCM39HJ99MYV6DACCVGWFM,CREATE VIEW,0,2.19,,initial view creation
+2026-03-16,2026-03-16T13:15:53Z,dev,,fact_token_holder_daily_balance,01KKVCM5GKA8GPHRHRKD8T8HBD,CREATE TABLE,2550465,21.97,,first load — spine + cumulative balance from stg_token_holder_transfers
+2026-03-16,2026-03-16T12:56:24Z,dev,,stg_token_holder_transfers,01KKVBGQDN7RAK72KDH9BVKAB0,CREATE TABLE,2544063,222.75,,first load — full history for all tokens in dim_labels
+2026-03-16,2026-03-16T11:32:32Z,dev,,int_dex_pool_created,01KKV6PTR2M7WC1MSQ5MV18467,CREATE VIEW,0,4.74,,step 0 — refresh views before full-refresh transfers backfill (Curve twocrypto_ng fix)
+2026-03-16,2026-03-16T11:32:32Z,dev,,int_dex_pool_daily_net_change,01KKV6PZA0YH17XQFNP006R37K,CREATE VIEW,0,1.71,,step 0 — refresh views before full-refresh transfers backfill (Curve twocrypto_ng fix)
+2026-03-16,2026-03-16T11:18:48Z,dev,,stg_curve_twocrypto_ng_pool_created,01KKV5XQ29S9TVC3S86FD9Q9A7,CREATE TABLE,1215,339.05,,full-refresh after fixing ABI indexed flags (pool+deployer false) — all data fields now non-null
+2026-03-16,2026-03-16T07:45:52Z,dev,,stg_dex_pool_token_transfers,01KKTSQV767M92TVYCNJ23TKDQ,CREATE TABLE,5937685998,859.96,,full-refresh to backfill Curve pool transfers (all 4 versions)
+2026-03-16,2026-03-16T07:44:12Z,dev,,int_dex_pool_created,01KKTSNK0YK2VK0DEDVNZEBVNQ,CREATE VIEW,0,5.00,,refresh stale view — added Curve branches + min_block_time column missing in dev
+2026-03-16,2026-03-16T07:37:59Z,dev,,stg_curve_stableswap_legacy_pool_created,01KKTS9B37E10941WV71YYYVP0,CREATE TABLE,861,89.30,,full-refresh after dim view fix — confirms 0-rows bug resolved
+2026-03-16,2026-03-16T07:37:59Z,dev,,stg_curve_tricrypto_ng_pool_created,01KKTS9ATYX8Q7R9A62JWK8EF5,CREATE TABLE,320,123.01,,full-refresh after dim view fix — confirms 0-rows bug resolved
+2026-03-16,2026-03-16T07:37:59Z,dev,,stg_curve_stableswap_ng_pool_created,01KKTS9AW01NCZ6A090YYS8S5Z,CREATE TABLE,1813,144.95,,full-refresh after dim view fix — confirms 0-rows bug resolved
+2026-03-16,2026-03-16T07:37:59Z,dev,,stg_curve_twocrypto_ng_pool_created,01KKTS9AV4S11SC6F0E6V9DESZ,CREATE TABLE,1215,211.03,,full-refresh after dim view fix — confirms 0-rows bug resolved
+2026-03-16,2026-03-16T07:36:10Z,dev,,dim_dex_factory_addresses,01KKTS626A3MBW6BREFJ1MAG6S,CREATE VIEW,0,2.30,,refresh dim view to pick up Curve factory addresses after stale-view bug
 2026-03-10,2026-03-10T08:29:46Z,dev,,dim_dex_factory_addresses,,CREATE VIEW,0,1.77,,first successful run using dim view approach
 2026-03-10,2026-03-10T08:29:46Z,dev,,stg_uniswap_v2_pool_created,,CREATE TABLE,4632514,227.19,,first successful run using dim view approach
 2026-03-10,2026-03-10T14:07:38Z,dev,,dim_dex_factory_addresses,,CREATE VIEW,0,1.76,,initial uniswap v3 load
@@ -30,3 +43,16 @@ run_date,run_timestamp,target,vars,model,query_id,operation,rows_affected,durati
 2026-03-11,2026-03-11T10:07:26Z,dev,,stg_pancakeswap_v2_pool_created,01KKE5VESR256BKK6E6SZ2V0W8,CREATE TABLE,2492337,1436.99,,full-refresh all chains
 2026-03-11,2026-03-11T11:03:43Z,dev,,stg_dex_pool_token_transfers,01KKE92HD6EDRC4HCN55KJMR42,CREATE TABLE,5876310235,1327.79,,full-refresh all chains
 2026-03-11,2026-03-11T11:29:01Z,dev,,fact_dex_pool_token_balance,01KKEAGTBWZSQJFJ6J13NM0K2D,CREATE TABLE,716586889,725.82,,all-chains mart rebuild
+2026-03-16,2026-03-16T07:03:59Z,dev,,stg_curve_twocrypto_ng_pool_created,01KKTQB3YEN08Q3HKEKST7H04W,CREATE TABLE (0 rows),0,25.17,,full-refresh curve staging for new factory addresses
+2026-03-16,2026-03-16T07:03:59Z,dev,,stg_curve_stableswap_legacy_pool_created,01KKTQB3XE8B5GGC9CVVBDTJ4S,CREATE TABLE (0 rows),0,37.66,,full-refresh curve staging for new factory addresses
+2026-03-16,2026-03-16T07:03:59Z,dev,,stg_curve_tricrypto_ng_pool_created,01KKTQB3XMRD6BFEFY89MN6QXJ,CREATE TABLE (0 rows),0,37.71,,full-refresh curve staging for new factory addresses
+2026-03-16,2026-03-16T07:03:59Z,dev,,stg_curve_stableswap_ng_pool_created,01KKTQB3XK0M0XQMGVQZ8VDXSG,CREATE TABLE (0 rows),0,81.70,,full-refresh curve staging for new factory addresses
+2026-03-16,2026-03-16T07:21:36Z,dev,,stg_curve_stableswap_legacy_pool_created,01KKTRBCMHG0GCTPPN08AFT22Z,CREATE TABLE (0 rows),0,37.31,,re-run to confirm 0 rows issue
+2026-03-16,2026-03-16T08:17:15Z,dev,,dim_labels,01KKTVH8BQ0C17A7YRQXVVZ94P,CREATE VIEW,0,2.63,,refresh stale dev view — min_block_number and min_block_time columns were missing before token supply first run
+2026-03-16,2026-03-16T08:18:34Z,dev,,int_dex_pool_daily_net_change,01KKTVKWRJBEP1GQ5SPAK01T23,CREATE VIEW (0 rows),0,2.46,,refresh stale view — pool_creation_block_time renamed to min_block_time; needed before mart rebuild
+2026-03-16,2026-03-16T08:20:34Z,dev,,fact_dex_pool_daily_token_balance,01KKTVQBCEG4XZTH9F6BF204NV,CREATE TABLE (729_275_540 rows),729275540,290.77,,mart rebuild after Curve onboarding — all protocols inc. Curve 4 versions
+2026-03-16,2026-03-16T08:50:57Z,dev,,stg_curve_twocrypto_ng_pool_created,01KKTXF0W7BGJMX3KKJTA4CV0K,CREATE TABLE (1_215 rows),1215,443.26,,full-refresh to investigate missing pool — row count unchanged at 1215
+2026-03-16,2026-03-16T08:28:54Z,dev,,fact_token_daily_supply,01KKTW6JSJPK5A8HF1XC3JKMKH,CREATE TABLE,3926,3.88,,first-ever run — 3926 rows; fixed d.timestamp column name; prices join removed
+2026-03-16,2026-03-16T08:17:38Z,dev,,stg_token_mint_burn_events,01KKTVJ1CDN1ZA9NB6AN4AAPHA,CREATE TABLE,102072,80.71,,first-ever load — full-refresh all history for USDai + sUSDai on arbitrum/base/plasma
+2026-03-16,2026-03-16T13:43:07.934801Z,dev,,stg_dex_pool_token_transfers,01KKVE5YH1KJHRYXEM8YDWASX5,CREATE TABLE,5940582967,984.45,,full-refresh to backfill Curve twocrypto_ng transfers — 1215 pools had null pool address in prior data; entire transfer history missing
+2026-03-17,2026-03-17T03:58:29.903400Z,dev,,fact_dex_pool_daily_token_balance,01KKWZ4A87H1X357MDX37SSV44,CREATE TABLE,731746436,498.29,,mart rebuild after Curve twocrypto_ng ABI fix — 1215 pools now included; row count 729M→731M

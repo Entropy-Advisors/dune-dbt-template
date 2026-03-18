@@ -1,24 +1,19 @@
 version: 2
 
 models:
-  - name: int_token_daily_supply
+  - name: int_token_daily_net_change
     description: >
-      Daily supply aggregation per token per chain with gap-filled time series and cumulative columns.
-      Days are generated via utils.days cross-joined from each token's first transfer.
-      No prices or market cap — those are added in fact_token_supply.
+      Daily mint/burn volumes and net change per token per chain. One row per (day, blockchain,
+      contract_address) for days with activity — no gap-fill, no spine, no cumulative columns.
 
-      Fed by: `stg_token_mint_burn_events` (already filtered to dim_labels whitelist).
-      Token whitelist and start_block filter are applied in staging — not here.
-      category comes directly from the staging model.
-      Feeds: `fact_token_supply`.
+      Fed by: `stg_token_mint_burn_events`.
+      Feeds: `fact_token_daily_supply`.
 
-      Materialization note: materialized as `table` (exception to the intermediate=view default).
-      The gap-fill cross join (utils.days × distinct tokens) produces a large row set and uses
-      window functions for cumulative columns — keeping this as a view would re-run that work on
-      every downstream query. The table materialization amortizes the cost.
+      Cheap GROUP BY view — mirrors the DEX pattern (`int_dex_pool_daily_net_change`).
+      The daily spine, gap-fill, and cumulative columns are owned by `fact_token_daily_supply` (the mart).
     columns:
-      - name: date
-        description: "Day-truncated date"
+      - name: day
+        description: "Day-truncated date (days with no activity are absent — no gap-fill here)"
         tests:
           - not_null
       - name: blockchain
@@ -29,16 +24,46 @@ models:
           - not_null
       - name: symbol
       - name: category
-        description: "Token category from dim_labels (sourced via staging). Always populated, including on gap-filled days."
+        description: "Token category from dim_labels (sourced via staging)"
       - name: mint_volume
-        description: "Tokens minted on this day (NULL for gap-filled days)"
+        description: "Tokens minted on this day"
       - name: burn_volume
-        description: "Tokens burned on this day (NULL for gap-filled days)"
+        description: "Tokens burned on this day (positive figure)"
       - name: net_change
-        description: "mint_volume - burn_volume (NULL for gap-filled days)"
-      - name: mint_volume_cumulative
-        description: "Running cumulative mints up to this day"
-      - name: burn_volume_cumulative
-        description: "Running cumulative burns up to this day"
-      - name: circulating_supply
-        description: "Running cumulative net_change (mints - burns) up to this day"
+        description: "mint_volume - burn_volume for this day"
+
+  - name: int_token_holder_daily_net_change
+    description: >
+      Daily net transfer amount per (blockchain, contract_address, wallet_address).
+      One row per (day, wallet, token) for days with activity — no gap-fill, no spine, no cumulative columns.
+
+      Fed by: `stg_token_holder_transfers`.
+      Feeds: `fact_token_holder_daily_balance`.
+
+      `min_block_time` passes through from `dim_labels` (token deployment timestamp, constant per contract)
+      and is used by the mart to anchor the per-wallet days spine.
+
+      Cheap GROUP BY view — mirrors the DEX pattern (`int_dex_pool_daily_net_change`).
+      The daily spine, gap-fill, and cumulative balance are owned by `fact_token_holder_daily_balance`.
+    columns:
+      - name: day
+        description: "Day-truncated date (days with no activity are absent — no gap-fill here)"
+        tests:
+          - not_null
+      - name: blockchain
+        tests:
+          - not_null
+      - name: contract_address
+        tests:
+          - not_null
+      - name: wallet_address
+        description: "Wallet address (zero address excluded)"
+        tests:
+          - not_null
+      - name: symbol
+      - name: category
+        description: "Token category from dim_labels (sourced via staging)"
+      - name: min_block_time
+        description: "Token deployment timestamp from dim_labels (constant per contract)"
+      - name: net_change
+        description: "Sum of signed amounts for this (day, wallet, token) — positive = net inflow, negative = net outflow"

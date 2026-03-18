@@ -80,9 +80,7 @@ For each factory address, find the block it was deployed in. Use this priority o
 
 1. **Official docs** — some protocols list block numbers next to addresses
 2. **GitHub** — look for `deployments.json`, `addresses.json`, or deployment scripts
-3. **Block explorer** — search `"<chain> <contract_address> contract creation"` — the creation transaction shows the exact block
-4. **Block explorer contract page** — the "Contract Creator" row links to the creation transaction
-5. **If not found** — do NOT include the row in `dim_dex_factory_addresses.sql`. Leave it out and note it in the job file as a TODO. Do not use 0 — scanning from block 0 is extremely expensive on Dune.
+3. **If not readily available** — use `null` for `min_block_number` and note the deployment tx hash in a comment above the row. The user fills these in manually from a block explorer. Do not burn tokens on block explorer lookups. Do not use 0 — scanning from block 0 is extremely expensive on Dune.
 
 ---
 
@@ -121,7 +119,7 @@ Confirmed Dune chain name mappings:
 
 > **Do NOT run a factory address refresh job here.** You already have the addresses from Steps 1–4. Refresh jobs (`jobs/refresh_*.md`) are a separate, scheduled operation run monthly via GitHub Actions. Model creation never triggers them.
 
-Add the factory addresses you found in Step 1 directly to `models/utils/factory_addresses/dim_dex_factory_addresses.sql`:
+Add the factory addresses you found in Step 1 directly to `models/utils/dex/dim_dex_factory_addresses.sql`:
 
 1. Find the `-- <Protocol> V<version>` comment block for your protocol, or add a new block if the protocol doesn't exist yet
 2. Add one row per (blockchain, contract_address):
@@ -131,10 +129,16 @@ Add the factory addresses you found in Step 1 directly to `models/utils/factory_
 3. Commit the updated file
 
 Address rules:
-- `min_block_number` must be a confirmed positive integer — never 0
+- `min_block_number` should be a confirmed positive integer when available; use `null` if unknown (note the deployment tx hash in a comment so the user can fill it in manually). Never use 0.
 - `contract_address` should be checksummed hex
 - The same address may appear on multiple chains (CREATE2) — valid as long as `blockchain` differs
 - No duplicate (protocol, version, blockchain, contract_address) tuples
+
+> **⚠️ Gotcha: re-run all changed views before running any staging model**
+> After editing `dim_dex_factory_addresses.sql` or `int_dex_pool_created.sql`, you must re-run those views in your target environment before running any staging model that depends on them. `dbt --select stg_*` does not automatically re-run parent views. If you skip this, a stale view silently returns wrong results or raises a "column cannot be resolved" error.
+> ```bash
+> set -a && source .env && set +a && uv run dbt run --select dim_dex_factory_addresses int_dex_pool_created int_dex_pool_daily_net_change
+> ```
 
 ---
 
@@ -197,7 +201,7 @@ where
     {%- endif %}
 ```
 
-The tuple `IN` filter is not redundant with the INNER JOIN — it gives Trino an explicit predicate to push down to the Parquet scan level (partition pruning on `blockchain`, row-group skipping on `contract_address`). The JOIN alone applies after pages are read; the WHERE predicate applies before. Use the tuple form (not two separate `IN` clauses) so only valid `(blockchain, contract_address)` pairs from the factory table are matched.
+The tuple `IN` filter is intentional — do not remove it. See CLAUDE.md → "Trino-specific SQL patterns" → WHERE-before-JOIN predicate pattern for rationale.
 
 **Why 3 days, not 1:**
 - **Reorg protection** — blockchain reorganizations can invalidate recent blocks. `delete+insert` on 3 days deletes and re-writes those rows with the correct data. A 1-day window risks keeping stale data from a reorged block.
@@ -229,7 +233,7 @@ Keep it lean — protocol-specific facts only. Structure:
 - **Goal**: one sentence
 - **Suggested Frequency**: Monthly
 - **Source of Truth**: official docs URL
-- **Target File**: `models/utils/factory_addresses/dim_dex_factory_addresses.sql`
+- **Target File**: `models/utils/dex/dim_dex_factory_addresses.sql`
 - **What to Do**: numbered steps (read `dim_dex_factory_addresses.sql` → fetch official list → compare → add missing rows)
 - **ABI**: event signature, topic0, cross-contamination warning (list all protocols that share the same topic0)
 - **Validation Rules**: no deletes, no duplicates, positive integer block numbers only

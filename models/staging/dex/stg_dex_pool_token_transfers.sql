@@ -18,158 +18,32 @@
 -- price_usd and amount_usd are captured at transfer time for future TVL use — not used in balance models.
 --
 -- Optimization: transfers are filtered to whitelisted tokens per pool and to blocks
--- at or after each pool's creation (min_block_number). This eliminates dust/airdrop noise and pre-pool history.
--- Curve note: pools with 3–8 tokens (tricrypto_ng, stableswap_ng, stableswap_legacy) are fully covered —
--- token2 through token7 are included in the pool_tokens whitelist wherever non-null.
---
--- V4 note: Uniswap V4 pools do not have individual contracts. All V4 liquidity is held in the
--- PoolManager contract (one per chain). We use contract_address (PoolManager) as the pool identifier
--- for V4 so that token transfers to/from the PoolManager are captured. This means V4 balance is
--- tracked at the PoolManager level (aggregate of all V4 pools per chain) — this is intentional.
--- For V2/V3, pool_address is the pool contract itself.
+-- at or after each pool's creation (min_block_time). This eliminates dust/airdrop noise and pre-pool history.
+-- Curve multi-token pools (up to 8 coins) and Uniswap V4 (PoolManager-level tracking) are handled
+-- in the pool_tokens CTE via UNNEST — no per-protocol branches required.
 
 with
 
 pool_tokens as (
     -- Build the whitelisted set of (pool_address, token_address) pairs with min creation block.
-    -- Non-Uniswap-V4: pool_address is the pool contract; token0 and token1 are always present.
-    --   Curve multi-coin pools (tricrypto_ng, stableswap_ng, stableswap_legacy) also carry
-    --   token2–token7 (null-guarded below). Creation block is unique per pool — no aggregation needed.
-    -- Uniswap V4: pool_address is the PoolManager (one per chain, holds all V4 liquidity).
-    --   Multiple V4 pools can share a token (e.g. two USDC/ETH pools with different fees).
-    --   GROUP BY + min(min_block_time) ensures each (blockchain, pool_address, token_address)
-    --   pair produces exactly one row — preventing fan-out on the transfer join.
-    -- Curve multi-token: token2–token7 branches cover tricrypto_ng (3 coins), stableswap_legacy
-    --   (up to 4 coins), and stableswap_ng (up to 8 coins). Each branch filters where token<N>
-    --   is not null — protocols with fewer tokens simply produce zero rows for those branches.
-
-    -- token0/token1 for all non-V4 protocols (including all Curve variants)
+    -- UNNEST pivots all 8 token slots in one pass — one read of int_dex_pool_created vs 10.
+    -- Non-V4: pool_address = pool contract. V4: pool_address = PoolManager (one per chain).
+    -- GROUP BY + min(min_block_time) collapses V4 fan-out (multiple pools sharing a token).
+    -- Curve multi-token pools (up to 8 coins) are covered automatically — null slots are filtered.
     select
         blockchain,
-        pool                            as pool_address,
+        case
+            when protocol = 'uniswap' and version = '4' then contract_address
+            else pool
+        end                             as pool_address,
         protocol,
         version,
-        token0                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where not (protocol = 'uniswap' and version = '4')
-
-    union all
-
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token1                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where not (protocol = 'uniswap' and version = '4')
-
-    union all
-
-    -- token0/token1 for Uniswap V4 (pool_address = PoolManager, one per chain).
-    -- Multiple V4 pools can share a token (e.g. two USDC/ETH pools with different fees),
-    -- so we GROUP BY and take min(min_block_time) to produce exactly one row per
-    -- (blockchain, pool_address, token_address) — preventing fan-out on the transfer join.
-    select
-        blockchain,
-        contract_address                as pool_address,
-        protocol,
-        version,
-        token0                          as token_address,
+        tok                             as token_address,
         min(min_block_time)             as min_block_time
     from {{ ref('int_dex_pool_created') }}
-    where protocol = 'uniswap' and version = '4'
+    cross join unnest(array[token0, token1, token2, token3, token4, token5, token6, token7]) as t(tok)
+    where tok is not null
     group by 1, 2, 3, 4, 5
-
-    union all
-
-    select
-        blockchain,
-        contract_address                as pool_address,
-        protocol,
-        version,
-        token1                          as token_address,
-        min(min_block_time)             as min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where protocol = 'uniswap' and version = '4'
-    group by 1, 2, 3, 4, 5
-
-    union all
-
-    -- token2: tricrypto_ng (always 3 coins), stableswap_ng (3+ coins), stableswap_legacy (3+ coins)
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token2                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where token2 is not null
-
-    union all
-
-    -- token3: stableswap_ng (4+ coins), stableswap_legacy (4 coins)
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token3                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where token3 is not null
-
-    union all
-
-    -- token4–7: stableswap_ng only (5–8 coins)
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token4                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where token4 is not null
-
-    union all
-
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token5                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where token5 is not null
-
-    union all
-
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token6                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where token6 is not null
-
-    union all
-
-    select
-        blockchain,
-        pool                            as pool_address,
-        protocol,
-        version,
-        token7                          as token_address,
-        min_block_time
-    from {{ ref('int_dex_pool_created') }}
-    where token7 is not null
 ),
 
 inflows as (

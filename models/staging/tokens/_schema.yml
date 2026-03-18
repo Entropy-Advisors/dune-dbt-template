@@ -7,7 +7,7 @@ models:
       One row per transfer event. No aggregation.
 
       Fed by: `tokens.transfers` (source) filtered via inner join + WHERE subquery on `dim_labels`.
-      Feeds into: `int_token_daily_supply`.
+      Feeds into: `int_token_daily_net_change`.
 
       Token whitelist: `dim_labels` (type = 'token') drives which tokens and chains are included.
       To add a token or chain: add a row to `dim_labels` — no SQL changes needed here.
@@ -16,8 +16,8 @@ models:
       pre-deployment history. `category` is pulled from `dim_labels` at this layer.
 
       Signed amount convention: all three amount fields (amount_raw, amount, amount_usd) are signed —
-      positive for mints, negative for burns. This differs from `stg_dex_pool_token_transfers` where
-      `amount_raw` is always positive.
+      positive for mints, negative for burns. Both staging models sign all three amount fields;
+      see CLAUDE.md → "Signed amount convention".
     columns:
       - name: blockchain
         description: "Chain name in lowercase (e.g. 'arbitrum', 'base', 'plasma')"
@@ -93,5 +93,103 @@ models:
         description: "Token price in USD at time of event from tokens.transfers (price_usd)"
       - name: amount_usd
         description: "USD value of the transfer. Positive for mints, negative for burns."
+        tests:
+          - not_null
+
+  - name: stg_token_holder_transfers
+    description: >
+      All ERC-20/native transfers for tokens whitelisted in `dim_labels`, split into two rows per event:
+      one inflow row (wallet_address = "to", amount positive) and one outflow row (wallet_address = "from",
+      amount negative). Together, this produces a signed ledger of wallet-level token movements.
+
+      Mint and burn transfers are included — they represent real balance changes for the recipient/sender.
+      The zero address (0x0) is excluded as a `wallet_address` in both branches; it is not a holder.
+
+      Fed by: `tokens.transfers` (source) filtered via inner join + WHERE subquery on `dim_labels`.
+      Feeds into: `int_token_holder_daily_net_change`.
+
+      Signed amount convention: all three amount fields (amount_raw, amount, amount_usd) are signed —
+      positive for inflows, negative for outflows.
+
+      Unique key: `(blockchain, tx_hash, evt_index, event_type)` — `event_type` differentiates the two
+      rows produced from a single transfer event.
+    columns:
+      - name: blockchain
+        description: "Chain name in lowercase (e.g. 'arbitrum', 'base', 'plasma')"
+        tests:
+          - not_null
+      - name: event_type
+        description: "'inflow' (wallet = to) or 'outflow' (wallet = from)"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['inflow', 'outflow']
+      - name: symbol
+        description: "Token symbol from tokens.transfers"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Token contract address"
+        tests:
+          - not_null
+      - name: category
+        description: "Asset category from dim_labels (e.g. 'stablecoin', 'ybs', 'rwa')"
+        tests:
+          - not_null
+      - name: min_block_time
+        description: "Token deployment timestamp from dim_labels (constant per contract — anchors the days spine in the mart)"
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the transaction"
+        tests:
+          - not_null
+      - name: tx_to
+        description: "Transaction recipient address"
+        tests:
+          - not_null
+      - name: tx_index
+        description: "Transaction index within the block"
+        tests:
+          - not_null
+      - name: evt_index
+        description: "Log event index within the transaction"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block containing the transfer event"
+        tests:
+          - not_null
+      - name: block_number
+        description: "Block number"
+        tests:
+          - not_null
+      - name: block_date
+        description: "Date of the block (partition column)"
+        tests:
+          - not_null
+      - name: wallet_address
+        description: "The wallet receiving (inflow) or sending (outflow) tokens"
+        tests:
+          - not_null
+      - name: amount_raw
+        description: >
+          Raw on-chain integer amount, cast to double and signed.
+          Positive for inflows, negative for outflows.
+        tests:
+          - not_null
+      - name: amount
+        description: "Decimal-adjusted token amount. Positive for inflows, negative for outflows."
+        tests:
+          - not_null
+      - name: price
+        description: "Token price in USD at time of event from tokens.transfers (price_usd)"
+      - name: amount_usd
+        description: "USD value of the transfer. Positive for inflows, negative for outflows."
         tests:
           - not_null

@@ -12,7 +12,7 @@ models:
       Fed by: no upstream dbt models — rows are maintained directly in dim_labels.sql.
       Feeds: `stg_token_mint_burn_events` (primary consumer — joins on blockchain + address
         where type = 'token', using min_block_number to skip pre-deployment transfers).
-        Also feeds `int_token_daily_supply` (via min_block_time to anchor the daily spine).
+        Also feeds `fact_token_daily_supply` (via min_block_time to anchor the daily spine).
 
       Update path: add a VALUES row to dim_labels.sql for each new (blockchain, address) pair.
       Required fields: blockchain, creator, address, name, label, type='token', category,
@@ -46,4 +46,4 @@ models:
       - name: min_block_number
         description: "First block number of the token contract on this chain. Used to skip pre-deployment blocks in source queries."
       - name: min_block_time
-        description: "Deployment timestamp of the token contract on this chain. Used as the spine start date in int_token_daily_supply."
+        description: "Deployment timestamp of the token contract on this chain. Used as the spine start date in fact_token_daily_supply."

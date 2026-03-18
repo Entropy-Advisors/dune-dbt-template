@@ -64,7 +64,7 @@ You should see: `All checks passed!`
 
 ## Running Models
 
-Factory addresses are stored as inline `VALUES()` in `models/utils/factory_addresses/dim_*_factory_addresses.sql` views — **no seed upload required or ever needed**. The views compile inline into each staging model query at run time.
+Factory addresses are stored as inline `VALUES()` in `models/utils/dex/dim_*_factory_addresses.sql` views — **no seed upload required or ever needed**. The views compile inline into each staging model query at run time.
 
 ```bash
 # Single model (recommended for first test):
@@ -85,7 +85,7 @@ set -a && source .env && set +a && uv run dbt run --exclude config.materialized:
 > - `dbt_deploy.yml` triggers `--full-refresh` automatically on any code-modified model when merging to main — do not merge staging SQL changes unless a full backfill is intentional
 > - `dbt_ci.yml` is disabled by default — keep it disabled; enabling it runs `--full-refresh` on every PR that touches staging files
 
-**Never run `dbt seed`.** There are no seeds in this project. Factory addresses live in `models/utils/factory_addresses/` as SQL views.
+**Never run `dbt seed`.** There are no seeds in this project. Factory addresses live in `models/utils/dex/` as SQL views.
 
 ---
 
@@ -141,7 +141,7 @@ The intermediate layer (`int_dex_pool_created`) is responsible for null-padding 
 
 > **Rule: Never refresh factory addresses as part of a SQL or dbt model job.** Factory address refresh is handled exclusively by `jobs/refresh_*.md` jobs, run on a monthly schedule via `.github/workflows/refresh_factory_addresses.yml`. When building or running any model, treat the addresses in `dim_dex_factory_addresses.sql` as current.
 
-Factory addresses live in `models/utils/factory_addresses/dim_dex_factory_addresses.sql` as inline `VALUES()`. There are two update paths:
+Factory addresses live in `models/utils/dex/dim_dex_factory_addresses.sql` as inline `VALUES()`. There are two update paths:
 
 ### Primary: Agent-driven (run a job)
 
@@ -178,6 +178,12 @@ and you've added its factory address to `dim_dex_factory_addresses.sql`.
 **Only full-refresh the staging models whose factory addresses changed.** If only SushiSwap
 added a new chain, you don't need to touch Uniswap or PancakeSwap staging.
 
+> **Step 0 — Refresh all stale views first (mandatory after any SQL change to a view):**
+> `--select stg_*` does NOT re-run parent dependencies. If any view in dev/prod still reflects old SQL, downstream models will fail or return 0 rows — no error is raised. After adding factory addresses or new protocol branches, refresh both views:
+> ```bash
+> set -a && source .env && set +a && uv run dbt run --select dim_dex_factory_addresses int_dex_pool_created int_dex_pool_daily_net_change
+> ```
+
 ```bash
 # Step 1: Full-refresh the affected protocol's pool creation staging model(s).
 # This rescans all history for that protocol across all chains — including the new one.
@@ -197,7 +203,7 @@ set -a && source .env && set +a && uv run dbt run \
 
 # Step 3: Rebuild the mart. Always a full rebuild — no --full-refresh flag needed.
 set -a && source .env && set +a && uv run dbt run \
-  --select fact_dex_pool_token_balance
+  --select fact_dex_pool_daily_token_balance
 
 # → Read target/run_results.json, append to docs/run_log.csv.
 ```
@@ -209,10 +215,16 @@ new UNION ALL branch in `int_dex_pool_created`).
 
 **Pre-run checklist (before any dbt run):**
 1. Create `models/staging/dex/{protocol}/stg_{protocol}_v2_pool_created.sql` — follow `jobs/NEW_MODEL_CHECKLIST.md`
-2. Add factory address rows to `models/utils/factory_addresses/dim_dex_factory_addresses.sql`
+2. Add factory address rows to `models/utils/dex/dim_dex_factory_addresses.sql`
 3. Add the new model as a UNION ALL branch in `models/intermediate/dex/int_dex_pool_created.sql`
 4. Update `accepted_values` for `protocol` in `models/intermediate/dex/_schema.yml` to include the new protocol name
 5. Add a `_schema.yml` entry for the new staging model in its subfolder
+
+> **Step 0 — Refresh all stale views first (mandatory after any SQL change to a view):**
+> `--select stg_*` does NOT re-run parent dependencies. If any view in dev/prod still reflects old SQL, downstream models will fail or return 0 rows — no error is raised. After adding factory addresses or new protocol branches, refresh both views:
+> ```bash
+> set -a && source .env && set +a && uv run dbt run --select dim_dex_factory_addresses int_dex_pool_created int_dex_pool_daily_net_change
+> ```
 
 ```bash
 # Step 1: Run the new pool creation staging model.
@@ -234,7 +246,7 @@ set -a && source .env && set +a && uv run dbt run \
 
 # Step 3: Rebuild the mart.
 set -a && source .env && set +a && uv run dbt run \
-  --select fact_dex_pool_token_balance
+  --select fact_dex_pool_daily_token_balance
 
 # → Read target/run_results.json, append to docs/run_log.csv.
 ```
@@ -254,14 +266,14 @@ The token mint/burn supply pipeline tracks circulating supply for whitelisted to
 
 ```
 tokens.transfers (source)
-  └── stg_token_mint_burn_events   [incremental, partitioned by blockchain+block_date]
-        └── int_token_daily_supply  [table — gap-filled daily series, spine from dim_labels]
-              └── fact_token_supply  [table — adds price join from prices.day]
+  └── stg_token_mint_burn_events    [incremental, partitioned by blockchain+block_date]
+        └── int_token_daily_net_change  [view — daily GROUP BY only, no spine]
+              └── fact_token_daily_supply  [table — spine, gap-fill, cumulative columns]
 ```
 
 ### Token whitelist — `dim_labels`
 
-Both the chain scope and token whitelist are driven by `dim_labels` (type = 'token'). Staging inner-joins to `dim_labels` to filter transfers to whitelisted tokens; the daily spine in `int_token_daily_supply` is built by cross-joining `utils.days` against `dim_labels` using `min_block_time` as the start date.
+Both the chain scope and token whitelist are driven by `dim_labels` (type = 'token'). Staging inner-joins to `dim_labels` to filter transfers to whitelisted tokens; the daily spine in `fact_token_daily_supply` is built by cross-joining `utils.days` against `dim_labels` using `min_block_time` as the start date.
 
 To add a new token or chain: add a row to `dim_labels` with `type = 'token'`, `min_block_number`, and `min_block_time`, then follow `jobs/NEW_TOKEN_CHAIN_CHECKLIST.md`.
 
@@ -270,8 +282,13 @@ To add a new token or chain: add a row to `dim_labels` with `type = 'token'`, `m
 | Model | Materialization | Reason |
 |-------|----------------|--------|
 | `stg_token_mint_burn_events` | `incremental` (delete+insert, 3-day lookback) | Source is `tokens.transfers` — full scan too expensive |
-| `int_token_daily_supply` | `table` | Gap-fill cross join + window functions; exception to intermediate=view default |
-| `fact_token_supply` | `table` | Final analytics output |
+| `int_token_daily_net_change` | `view` | Cheap daily GROUP BY — mirrors DEX convention (`int_dex_pool_daily_net_change`) |
+| `fact_token_daily_supply` | `table` | Owns the daily spine, gap-fill, and cumulative window functions |
+
+> **Dev environment — refresh views before running the mart.** `view` models (`dim_labels`, `int_token_daily_net_change`) are real database objects that must exist in the schema before a downstream `table` model can query them. dbt's `--select fact_token_daily_supply` does NOT automatically run upstream views. If either view is missing or stale in dev, the mart will fail. Refresh explicitly before the mart run:
+> ```bash
+> set -a && source .env && set +a && uv run dbt run --select dim_labels int_token_daily_net_change
+> ```
 
 ### Signed amount convention for mint/burn staging
 
@@ -311,6 +328,18 @@ Always nest `values` under `arguments:`. The flat form is deprecated and causes 
   )
   select * from with_balance where balance > 0
   ```
+
+- **WHERE-before-JOIN predicate pattern — do not remove.** Staging models that join a large source table (e.g. `tokens.transfers`, `evms.logs`) against a small whitelist CTE deliberately repeat the join key as an explicit `WHERE ... IN (...)` filter:
+  ```sql
+  from tokens.transfers as t
+  inner join labeled as l
+      on  t.blockchain       = l.blockchain
+      and t.contract_address = l.address
+  where
+      (t.blockchain, t.contract_address) in (select blockchain, address from labeled)
+      and t.block_number >= l.min_block_number
+  ```
+  This looks redundant but is intentional: Trino's predicate pushdown can use an explicit `WHERE` semi-join filter to prune the large table **at scan time**, before the join is evaluated. Relying solely on the `INNER JOIN` condition requires Trino's dynamic filtering to kick in, which is less reliable for large fan-out scans on Dune. **Never remove this pattern from staging models.**
 
 ### Signed amount convention (transfer models)
 

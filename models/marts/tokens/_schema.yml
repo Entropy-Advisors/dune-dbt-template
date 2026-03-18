@@ -1,28 +1,28 @@
 version: 2
 
 models:
-  - name: fact_token_supply
+  - name: fact_token_daily_supply
     description: >
-      Daily circulating supply and market cap per token per chain.
+      Daily circulating supply per token per chain.
       All days from deployment onward are gap-filled — quiet days appear with NULL
       mint/burn/net_change but carry forward cumulative and supply values.
 
-      Fed by: `int_token_daily_supply` (supply columns), `prices.day` (price join).
-      Price join key: (date = day, blockchain, contract_address).
+      Fed by: `int_token_daily_net_change` (daily activity), `dim_labels` (spine anchor).
 
-      market_cap = circulating_supply × price. NULL when price is unavailable for that day.
-      blockchain is title-cased via initcap() (e.g. 'Ethereum', 'Base', 'Arbitrum') to match
-      Dune dashboard conventions.
+      Owns the daily spine (utils.days × dim_labels), gap-fill, and cumulative window functions.
+      This is where the expensive logic lives — the intermediate is a cheap GROUP BY view.
+
+      Price join deferred — add when a prices source is available.
     columns:
       - name: date
         description: "Day-truncated date"
       - name: blockchain
-        description: "Chain name, title-cased (e.g. Ethereum, Base, Arbitrum)"
+        description: "Chain name in lowercase (e.g. base, arbitrum, plasma)"
       - name: contract_address
         description: "Token contract address"
       - name: symbol
-      - name: price
-        description: "Token price in USD from prices.day"
+      - name: category
+        description: "Asset category from dim_labels (e.g. 'stablecoin', 'ybs', 'rwa')"
       - name: mint_volume
         description: "Tokens minted on this day (NULL for quiet days)"
       - name: burn_volume
@@ -35,5 +35,32 @@ models:
         description: "Running cumulative burns"
       - name: circulating_supply
         description: "Running cumulative net_change (mints - burns)"
-      - name: market_cap
-        description: "circulating_supply × price"
+
+  - name: fact_token_holder_daily_balance
+    description: >
+      Daily token balance per (blockchain, contract_address, wallet_address).
+      All days from the token's deployment date onward are gap-filled — quiet days appear with NULL
+      net_change but carry forward the cumulative balance.
+
+      Fed by: `int_token_holder_daily_net_change` (daily activity + spine anchor via min_block_time).
+
+      Owns the daily spine (utils.days × wallet_tokens), gap-fill, and cumulative window function.
+      Rows where `balance <= 0` are excluded — wallets that have fully exited and rounding artefacts.
+    columns:
+      - name: day
+        description: "Calendar date (UTC)"
+      - name: blockchain
+        description: "Chain name in lowercase (e.g. base, arbitrum, plasma)"
+      - name: contract_address
+        description: "Token contract address"
+      - name: wallet_address
+        description: "Wallet address holding the token"
+      - name: symbol
+      - name: category
+        description: "Asset category from dim_labels (e.g. 'stablecoin', 'ybs', 'rwa')"
+      - name: min_block_time
+        description: "Token deployment timestamp from dim_labels — used to anchor the days spine"
+      - name: net_change
+        description: "Net token flow into the wallet on this day; NULL on gap-filled days with no transfers"
+      - name: balance
+        description: "Cumulative token balance held by the wallet at end of day; rows where balance <= 0 are excluded"

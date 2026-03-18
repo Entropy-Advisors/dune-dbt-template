@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: fact_dex_pool_token_balance
+  - name: fact_dex_pool_daily_token_balance
     description: >
       Daily token balance per (blockchain, pool, token).
       Built from a gap-filled days spine cross-joined with all observed (pool, token) pairs,

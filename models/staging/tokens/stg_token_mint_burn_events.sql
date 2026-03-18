@@ -10,13 +10,13 @@
     )
 }}
 
--- Mint and burn transfer events for tokens whitelisted in dim_labels (type = 'token').
+-- Mint and burn transfer events for tokens whitelisted in dim_labels.
 -- One row per transfer event where "from" = 0x0 (mint) or "to" = 0x0 (burn).
 --
 -- Fed by: tokens.transfers (Dune source), dim_labels (token whitelist + min_block_number filter).
--- Feeds:  int_token_daily_supply.
+-- Feeds:  int_token_daily_net_change.
 --
--- Whitelist: dim_labels (type = 'token') controls both which tokens and which chains are scanned.
+-- Whitelist: dim_labels controls both which tokens and which chains are scanned.
 -- Adding a new token or chain requires only a new row in dim_labels — no SQL changes here.
 --
 -- Signed amounts: all three amount fields (amount_raw, amount, amount_usd) are signed —
@@ -27,14 +27,13 @@
 
 with
 
-labeled as (
+labels as (
     select
         blockchain,
         address,
         category,
         min_block_number
     from {{ ref('dim_labels') }}
-    where type = 'token'
 ),
 
 transfers as (
@@ -59,11 +58,11 @@ transfers as (
         l.category,
         l.min_block_number
     from {{ source('tokens', 'transfers') }} as t
-    inner join labeled as l
+    inner join labels as l
         on  t.blockchain       = l.blockchain
         and t.contract_address = l.address
     where
-        (t.blockchain, t.contract_address) in (select blockchain, address from labeled)
+        (t.blockchain, t.contract_address) in (select blockchain, address from labels)
         and t.block_number >= l.min_block_number
         and (
             t."from" = 0x0000000000000000000000000000000000000000
@@ -83,6 +82,7 @@ select
     symbol,
     contract_address,
     category,
+    min_block_number,
     tx_hash,
     tx_from,
     tx_to,
@@ -94,7 +94,6 @@ select
     "from",
     "to",
     -- Signed amounts: positive = tokens entering supply (mint), negative = leaving (burn).
-    -- Note: amount_raw is signed here (differs from stg_dex_pool_token_transfers convention).
     -- See CLAUDE.md → "Signed amount convention" for rationale.
     case when "from" = 0x0000000000000000000000000000000000000000
          then  cast(amount_raw as double)

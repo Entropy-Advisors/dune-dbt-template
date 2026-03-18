@@ -29,7 +29,7 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add models/utils/factory_addresses/dim_dex_factory_addresses.sql
+          git add models/utils/dex/dim_dex_factory_addresses.sql
           git diff --staged --quiet && echo "No changes to commit" || (
             git commit -m "chore: sync factory addresses from Google Sheet" &&
             git push

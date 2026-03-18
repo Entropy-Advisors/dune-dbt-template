@@ -21,7 +21,7 @@ Cross-reference with:
 ## Target File
 
 ```
-models/utils/factory_addresses/dim_dex_factory_addresses.sql
+models/utils/dex/dim_dex_factory_addresses.sql
 ```
 
 Columns: `protocol`, `version`, `blockchain`, `contract_address`, `min_block_number`
@@ -53,7 +53,7 @@ Source: curve-js `src/constants/network_constants.ts`
 
 ## What to Do
 
-1. Read the current contents of `models/utils/factory_addresses/dim_dex_factory_addresses.sql`
+1. Read the current contents of `models/utils/dex/dim_dex_factory_addresses.sql`
 2. Fetch the official deployment list from the curve-js source above
 3. Compare — identify any (blockchain, contract_address) pairs in the official list that are
    NOT already in the SQL file for `protocol = 'curve'` and `version = 'tricrypto_ng'`

@@ -25,13 +25,13 @@ Run each of the following jobs in order. For each one, follow its instructions f
 13. `jobs/refresh_curve_stableswap_ng_deployments.md`
 14. `jobs/refresh_curve_stableswap_legacy_deployments.md`
 
-All edits go to the same file: `models/utils/factory_addresses/dim_dex_factory_addresses.sql`.
+All edits go to the same file: `models/utils/dex/dim_dex_factory_addresses.sql`.
 
 ## Rules
 
 - Never delete or modify existing rows
 - No duplicate (protocol, version, blockchain, contract_address) pairs
-- `min_block_number` must be a confirmed positive integer — never 0
+- `min_block_number` should be a confirmed positive integer when available; use `null` if the block number cannot be found without a block explorer lookup — note the deployment tx hash in a comment. Never use 0.
 - Only add addresses from each protocol's official source (see individual job files)
 
 ## Output / Report

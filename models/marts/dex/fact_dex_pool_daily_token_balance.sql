@@ -1,6 +1,6 @@
 {{
     config(
-        alias = 'fact_dex_pool_token_balance',
+        alias = 'fact_dex_pool_daily_token_balance',
         materialized = 'table'
     )
 }}

@@ -58,7 +58,7 @@ Rules enforced by the script:
 The sync script has a `FILE_MAP` that maps `(protocol, version)` groups to output SQL files. To add a new dim table:
 
 1. Add rows to the Google Sheet (or a new sheet tab)
-2. Add a new `dim_<protocol>_factory_addresses.sql` file in `models/utils/factory_addresses/`
+2. Add a new `dim_<protocol>_factory_addresses.sql` file in `models/utils/dex/`
 3. Add the mapping to `FILE_MAP` in `scripts/sync_factory_addresses.py`
 4. Run the sync script
 

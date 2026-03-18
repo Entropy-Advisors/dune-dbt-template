@@ -8,7 +8,7 @@
 -- Daily net token change per (blockchain, pool, token).
 -- Sums all inflows and outflows (already signed) for each day.
 -- This is a cheap GROUP BY view — no window functions, no cumulative logic.
--- The running balance is computed in fact_dex_pool_token_balance (mart, table).
+-- The running balance is computed in fact_dex_pool_daily_token_balance (mart, table).
 
 select
     blockchain,

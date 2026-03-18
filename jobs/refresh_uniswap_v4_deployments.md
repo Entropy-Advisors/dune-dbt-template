@@ -20,14 +20,14 @@ Cross-reference with:
 ## Target File
 
 ```
-models/utils/factory_addresses/dim_dex_factory_addresses.sql
+models/utils/dex/dim_dex_factory_addresses.sql
 ```
 
 Columns: `protocol='uniswap'`, `version='4'`, `blockchain`, `contract_address`, `min_block_number`
 
 ## What to Do
 
-1. Read the current Uniswap V4 entries in `models/utils/factory_addresses/dim_dex_factory_addresses.sql`
+1. Read the current Uniswap V4 entries in `models/utils/dex/dim_dex_factory_addresses.sql`
 2. Fetch the official deployment list from the source URL above
 3. Compare — identify any (blockchain, contract_address) pairs in the official list that are NOT already tracked
 4. For each missing deployment, add a new row with blockchain, checksummed contract_address, and min_block_number
