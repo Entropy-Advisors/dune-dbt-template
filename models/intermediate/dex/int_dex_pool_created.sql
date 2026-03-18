@@ -11,8 +11,10 @@
 -- V4 has additional columns: hooks, sqrt_price_x96, tick.
 --   V4 pool = PoolId (bytes32), not a pool contract address.
 --   V4 contract_address = PoolManager (one per chain, not a factory).
+-- Balancer V2: fee = NULL (fee is per-pool, not in the creation event); token2-token7 cardinality-guarded.
+-- Balancer V3: fee = swapFeePercentage (uint256, 18-decimal fixed point); token2-token7 cardinality-guarded.
 -- token2-token7: NULL for 2-token protocols; token2 only for tricrypto_ng (always 3 coins);
---   token2-token3 for stableswap_legacy (up to 4 coins); token2-token7 for stableswap_ng (up to 8 coins).
+--   token2-token3 for stableswap_legacy (up to 4 coins); token2-token7 for stableswap_ng and Balancer V2/V3 (up to 8 tokens).
 
 select
     blockchain,
@@ -403,3 +405,59 @@ select
     null                  as sqrt_price_x96,
     null                  as tick
 from {{ ref('stg_curve_stableswap_legacy_pool_created') }}
+
+union all
+
+select
+    blockchain,
+    contract_address,
+    protocol,
+    version,
+    block_date          as min_block_date,
+    block_time          as min_block_time,
+    block_number        as min_block_number,
+    tx_hash,
+    tx_from,
+    pool,
+    token0,
+    token1,
+    token2,
+    token3,
+    token4,
+    token5,
+    token6,
+    token7,
+    null                as fee,
+    null                as tick_spacing,
+    null                as hooks,
+    null                as sqrt_price_x96,
+    null                as tick
+from {{ ref('stg_balancer_v2_pool_created') }}
+
+union all
+
+select
+    blockchain,
+    contract_address,
+    protocol,
+    version,
+    block_date          as min_block_date,
+    block_time          as min_block_time,
+    block_number        as min_block_number,
+    tx_hash,
+    tx_from,
+    pool,
+    token0,
+    token1,
+    token2,
+    token3,
+    token4,
+    token5,
+    token6,
+    token7,
+    swap_fee_percentage as fee,
+    null                as tick_spacing,
+    null                as hooks,
+    null                as sqrt_price_x96,
+    null                as tick
+from {{ ref('stg_balancer_v3_pool_created') }}

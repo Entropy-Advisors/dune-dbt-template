@@ -31,24 +31,38 @@ root/
 ├── models/
 │   ├── templates/                          # Starter templates (reference only, not production models)
 │   ├── utils/                              # Reusable dimension/lookup models
-│   │   └── labels/
-│   │       └── dim_labels.sql              # Manual address labels, categories, and types
-│   ├── staging/                            # Clean and standardize raw source data (bronze layer)
-│   │   ├── core/
-│   │   ├── aave/
-│   │   ├── chainlink/
-│   │   ├── fluid/
-│   │   ├── morpho/
-│   │   └── uniswap/
-│   ├── intermediate/                       # Business logic and cross-protocol joins (silver layer)
 │   │   ├── dex/
-│   │   ├── lending/
-│   │   └── prices/
+│   │   │   └── dim_dex_factory_addresses.sql   # ✅ DEX factory address registry (inline VALUES)
+│   │   └── tokens/
+│   │       └── dim_labels.sql                  # ✅ Manual address labels, categories, and types
+│   ├── staging/                            # Clean and standardize raw source data (bronze layer)
+│   │   ├── dex/                                # ✅ DEX pool creation and token transfer staging
+│   │   │   ├── camelot/
+│   │   │   ├── curve/
+│   │   │   ├── gammaswap/
+│   │   │   ├── pancakeswap/
+│   │   │   ├── sushiswap/
+│   │   │   ├── uniswap/
+│   │   │   └── stg_dex_pool_token_transfers.sql
+│   │   ├── tokens/                             # ✅ Token mint/burn and holder transfer staging
+│   │   │   ├── stg_token_mint_burn_events.sql
+│   │   │   └── stg_token_holder_transfers.sql
+│   │   ├── core/                               # 📋 Planned
+│   │   ├── aave/                               # 📋 Planned
+│   │   ├── chainlink/                          # 📋 Planned
+│   │   ├── fluid/                              # 📋 Planned
+│   │   └── morpho/                             # 📋 Planned
+│   ├── intermediate/                       # Business logic and cross-protocol joins (silver layer)
+│   │   ├── dex/                                # ✅ Pool creation union + daily net change
+│   │   ├── tokens/                             # ✅ Daily mint/burn aggregation
+│   │   ├── lending/                            # 📋 Planned
+│   │   └── prices/                             # 📋 Planned
 │   └── marts/                              # Final analytics-ready datasets (gold layer)
-│       ├── dex/
-│       ├── lending/
-│       ├── morpho/
-│       └── prices/
+│       ├── dex/                                # ✅ Daily pool token balances
+│       ├── tokens/                             # ✅ Daily circulating supply
+│       ├── lending/                            # 📋 Planned
+│       ├── morpho/                             # 📋 Planned
+│       └── prices/                             # 📋 Planned
 └── tests/                                  # Custom data quality tests
 ```
 
@@ -56,7 +70,17 @@ root/
 
 ## Models
 
-### `utils/labels/` — Shared Dimension Tables
+### `utils/dex/` — DEX Dimension Tables
+
+| Model | Alias | Materialization | Status | Notes |
+|-------|-------|----------------|--------|-------|
+| `dim_dex_factory_addresses.sql` | `dim_dex_factory_addresses` | `view` | ✅ | Inline `VALUES()` registry of all tracked DEX factory contracts. Drives pool creation staging — only events from listed factories are decoded. |
+
+> To add a factory address: edit the inline `VALUES()` in `dim_dex_factory_addresses.sql` and run the relevant job in `jobs/`. See CLAUDE.md → "Updating Factory Addresses".
+
+---
+
+### `utils/tokens/` — Token Dimension Tables
 
 Manual labels and categorizations maintained by Entropy. Used as the whitelist and enrichment source across all layers — filter by `type` and/or `category` to scope downstream queries.
 
@@ -76,7 +100,7 @@ Manual labels and categorizations maintained by Entropy. Used as the whitelist a
 | `type` | varchar | Entity type, lowercase (e.g. `token`) |
 | `category` | varchar | Asset category, lowercase (e.g. `stablecoin`, `yield-bearing-stablecoin`, `rwa`) |
 
-> To add coverage: append rows to `dim_labels.sql`. No other files need changing.
+> To add a token: append a row to `dim_labels.sql` with `type = 'token'`. No other files need changing.
 
 ---
 
@@ -217,73 +241,230 @@ Final analytics-ready tables. These are the models exposed to dashboards, APIs, 
 
 ---
 
-## Token Circulating Supply & Market Cap
+## DEX Liquidity Pipeline
 
-Models that track the circulating supply and market cap of labelled ERC-20 tokens across Ethereum, Base, Arbitrum, and Plasma.
+Models that track the daily token balance held by DEX pools across all tracked protocols and chains.
 
-### Supply Logic
+### Architecture
 
-- **Mints** = transfers `FROM` the zero address (`0x000...000`) — new tokens entering circulation
-- **Burns** = transfers `TO` the zero address or dead address (`0x000...dead`) — tokens leaving circulation
-- **Circulating supply** = cumulative running sum of `net_change` (mint − burn) per chain, computed in `int_token_hourly_supply`
+Pool creation events from factory contracts are decoded per-protocol in staging, unified into a cross-protocol pool registry (`int_dex_pool_created`), then used to whitelist and classify token transfers into the pool. Signed inflow/outflow amounts are aggregated daily, then accumulated into a running balance per (pool, token, chain).
 
-### Token Scope
+### Protocols
 
-Driven by `dim_labels` filtered to `type = 'token'`. Amounts and prices sourced directly from `tokens.transfers` (decimal-adjusted). To add tokens, append rows to `dim_labels.sql`.
-
-Current tokens: `USDai`, `sUSDai`, `USCC`, `JTRSY`, `JAAA`, `USTB`, `USYC`
+| Protocol | Versions | Pool Type | Notes |
+|----------|----------|-----------|-------|
+| Uniswap | v2, v3, v4 | 2-token | V4: pool = PoolId (bytes32); all liquidity held in PoolManager — balance tracked at PoolManager level per chain |
+| SushiSwap | v2, v3 | 2-token | |
+| PancakeSwap | v2, v3 | 2-token | |
+| Camelot | v2, v3 | 2-token | V3 uses Algebra AMM — no fixed fee or tick_spacing |
+| GammaSwap | v1 | 2-token | |
+| Curve | twocrypto_ng, tricrypto_ng, stableswap_ng, stableswap_legacy | 2–8 tokens | Multi-token pools covered via token0–token7 columns |
+| Balancer | v2, v3 | 2–8 tokens | V2: pool = first 20 bytes of poolId; V3: pool emitted as indexed topic; fee = swapFeePercentage |
 
 ### Model Inventory
 
 | Layer | Model | Alias | Materialization | Status | Notes |
 |-------|-------|-------|----------------|--------|-------|
-| Utils | `utils/labels/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + labels/categories + `start_block` per chain |
-| Staging | `staging/tokens/stg_token_mint_burn_events.sql` | `stg_token_mint_burn_events` | `incremental` (delete+insert) | ✅ | Raw mint/burn rows with `transfer_type`; one row per transfer |
-| Intermediate | `intermediate/tokens/int_token_hourly_supply.sql` | `int_token_hourly_supply` | `table` | ✅ | Hourly aggregation + gap-fill via `utils.hours` + cumulative supply columns |
-| Mart | `marts/tokens/fact_token_supply.sql` | `fact_token_supply` | `table` | ✅ | Adds `prices.hour` join and `market_cap`; applies `initcap` on blockchain |
+| Utils | `utils/dex/dim_dex_factory_addresses.sql` | `dim_dex_factory_addresses` | `view` | ✅ | Inline `VALUES()` of tracked factory contracts |
+| Staging | `staging/dex/uniswap/stg_uniswap_v2_pool_created.sql` | `stg_uniswap_v2_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/uniswap/stg_uniswap_v3_pool_created.sql` | `stg_uniswap_v3_pool_created` | `incremental` | ✅ | Includes `fee`, `tick_spacing` |
+| Staging | `staging/dex/uniswap/stg_uniswap_v4_pool_initialized.sql` | `stg_uniswap_v4_pool_initialized` | `incremental` | ✅ | Event: `Initialize`; also captures `hooks`, `sqrt_price_x96`, `tick` |
+| Staging | `staging/dex/sushiswap/stg_sushiswap_v2_pool_created.sql` | `stg_sushiswap_v2_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/sushiswap/stg_sushiswap_v3_pool_created.sql` | `stg_sushiswap_v3_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/pancakeswap/stg_pancakeswap_v2_pool_created.sql` | `stg_pancakeswap_v2_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/pancakeswap/stg_pancakeswap_v3_pool_created.sql` | `stg_pancakeswap_v3_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/camelot/stg_camelot_v2_pool_created.sql` | `stg_camelot_v2_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/camelot/stg_camelot_v3_pool_created.sql` | `stg_camelot_v3_pool_created` | `incremental` | ✅ | Algebra AMM — `fee` and `tick_spacing` NULL |
+| Staging | `staging/dex/gammaswap/stg_gammaswap_pool_created.sql` | `stg_gammaswap_pool_created` | `incremental` | ✅ | |
+| Staging | `staging/dex/curve/stg_curve_twocrypto_ng_pool_created.sql` | `stg_curve_twocrypto_ng_pool_created` | `incremental` | ✅ | 2 tokens (token0, token1) |
+| Staging | `staging/dex/curve/stg_curve_tricrypto_ng_pool_created.sql` | `stg_curve_tricrypto_ng_pool_created` | `incremental` | ✅ | 3 tokens (token0–token2) |
+| Staging | `staging/dex/curve/stg_curve_stableswap_ng_pool_created.sql` | `stg_curve_stableswap_ng_pool_created` | `incremental` | ✅ | Up to 8 tokens (token0–token7) |
+| Staging | `staging/dex/curve/stg_curve_stableswap_legacy_pool_created.sql` | `stg_curve_stableswap_legacy_pool_created` | `incremental` | ✅ | Up to 4 tokens (token0–token3) |
+| Staging | `staging/dex/balancer/stg_balancer_v2_pool_created.sql` | `stg_balancer_v2_pool_created` | `incremental` | ✅ | Up to 8 tokens (token0–token7); pool = first 20 bytes of poolId |
+| Staging | `staging/dex/balancer/stg_balancer_v3_pool_created.sql` | `stg_balancer_v3_pool_created` | `incremental` | ✅ | Up to 8 tokens (token0–token7); fee = swapFeePercentage |
+| Staging | `staging/dex/stg_dex_pool_token_transfers.sql` | `stg_dex_pool_token_transfers` | `incremental` (delete+insert) | ✅ | One row per transfer; signed amounts (inflow +, outflow −) |
+| Intermediate | `intermediate/dex/int_dex_pool_created.sql` | `int_dex_pool_created` | `view` | ✅ | UNION ALL of all pool_created staging; normalises to shared schema with token0–token7, fee, tick_spacing, hooks |
+| Intermediate | `intermediate/dex/int_dex_pool_daily_net_change.sql` | `int_dex_pool_daily_net_change` | `view` | ✅ | Daily `SUM(amount)` per (blockchain, pool, token) — no spine, no cumulative logic |
+| Mart | `marts/dex/fact_dex_pool_daily_token_balance.sql` | `fact_dex_pool_daily_token_balance` | `table` | ✅ | Daily spine + gap-fill + cumulative balance window function; rows where `balance ≤ 0` excluded |
 
 ### Lineage
 
 ```
-dim_labels (start_block)
+dim_dex_factory_addresses (inline VALUES)
         │
-        ▼ (join, filter block_number >= start_block)
+        ▼ filters pool creation events to tracked factories
+stg_{protocol}_{version}_pool_created  (one model per protocol/version)
+        │
+        ▼ UNION ALL, normalised schema
+int_dex_pool_created  ←  blockchain, pool, protocol, version, token0..token7, fee, tick_spacing, hooks, ...
+        │
+        ▼ builds (pool_address, token_address) whitelist per (blockchain, pool, min_block_time)
+stg_dex_pool_token_transfers  ←  blockchain, block_date, pool, protocol, version, token_address, symbol, amount (signed), ...
+        │
+        ▼ daily GROUP BY (view — no spine, no gap-fill)
+int_dex_pool_daily_net_change  ←  day, blockchain, pool, protocol, version, token_address, symbol, net_change
+        │
+        ▼ cross join utils.days from min_block_time per (pool, token) + cumulative window function
+fact_dex_pool_daily_token_balance  ←  day, blockchain, pool, protocol, version, token_address, symbol, net_change, balance
+```
+
+### `fact_dex_pool_daily_token_balance` Schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `day` | date | Calendar date (UTC) |
+| `blockchain` | varchar | Chain name, lowercase |
+| `pool` | varbinary | Pool contract address (or PoolManager address for Uniswap V4) |
+| `protocol` | varchar | Protocol name, lowercase (e.g. `uniswap`, `curve`, `sushiswap`) |
+| `version` | varchar | Protocol version string (e.g. `2`, `3`, `4`, `stableswap_ng`) |
+| `token_address` | varbinary | ERC-20 token contract address |
+| `symbol` | varchar | Token symbol |
+| `net_change` | double | Net token flow into the pool on this day (inflow − outflow); NULL on gap-filled days with no transfers |
+| `balance` | double | Cumulative token balance held by the pool at end of day; rows where balance ≤ 0 are excluded |
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Uniswap V4 pool identifier | `contract_address` (PoolManager) | V4 has no individual pool contracts — all liquidity is held in one PoolManager per chain. Balance is tracked at the PoolManager level. |
+| Multi-token Curve pools | token0–token7 columns in `int_dex_pool_created` | Covers twocrypto_ng (2), tricrypto_ng (3), stableswap_legacy (≤4), stableswap_ng (≤8). NULL slots for missing tokens produce zero rows in the transfer whitelist. |
+| Signed amounts in staging | Inflow +, outflow − in `stg_dex_pool_token_transfers` | Enables simple `SUM(amount)` for daily net change without CASE WHEN downstream. |
+| WHERE semi-join in staging | `(blockchain, contract_address) IN (SELECT ...)` alongside INNER JOIN | Trino predicate pushdown uses an explicit WHERE semi-join to prune the large `tokens.transfers` table at scan time; relying on the JOIN condition alone is insufficient. |
+| balance > 0 filter in mart | Exclude rows where `balance ≤ 0` | Removes fully-drained pools and rounding/accounting artefacts. |
+| Gap-filling in mart | `utils.days` cross-joined from `min_block_time` per (pool, token) | Produces a continuous daily series; `net_change` is NULL on quiet days but `balance` carries forward correctly via the cumulative window. |
+
+---
+
+---
+
+## Token Supply Pipeline
+
+Models that track the circulating supply of labelled ERC-20 tokens across all chains represented in `dim_labels`.
+
+### Supply Logic
+
+- **Mints** = transfers `FROM` the zero address (`0x000...000`) — new tokens entering circulation
+- **Burns** = transfers `TO` the zero address (`0x000...000`) — tokens leaving circulation
+- **Circulating supply** = cumulative running sum of `net_change` (mint − burn) per chain, computed in `fact_token_daily_supply`
+
+### Token Scope
+
+Driven by `dim_labels` filtered to `type = 'token'`. Amounts sourced directly from `tokens.transfers` (decimal-adjusted). To add tokens, append rows to `dim_labels.sql`.
+
+### Model Inventory
+
+| Layer | Model | Alias | Materialization | Status | Notes |
+|-------|-------|-------|----------------|--------|-------|
+| Utils | `utils/tokens/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + labels/categories + `min_block_number` / `min_block_time` per chain |
+| Staging | `staging/tokens/stg_token_mint_burn_events.sql` | `stg_token_mint_burn_events` | `incremental` (delete+insert) | ✅ | Raw mint/burn rows with `event_type`; one row per transfer |
+| Intermediate | `intermediate/tokens/int_token_daily_net_change.sql` | `int_token_daily_net_change` | `view` | ✅ | Daily GROUP BY only — no spine, no gap-fill, no cumulative columns |
+| Mart | `marts/tokens/fact_token_daily_supply.sql` | `fact_token_daily_supply` | `table` | ✅ | Owns the daily spine, gap-fill, and cumulative window functions; price join deferred |
+
+### Lineage
+
+```
+dim_labels (min_block_number, min_block_time)
+        │
+        ▼ (inner join + WHERE semi-join, filter block_number >= min_block_number)
 tokens.transfers (mints/burns only)
         │
-        ▼ raw rows + transfer_type column
+        ▼ raw rows + event_type column
 stg_token_mint_burn_events
         │
-        ▼ aggregate to hourly
-supplies CTE  ──────────────────────────┐
-        │                               │ left join
-        ▼ cross join from min(date)     │
-utils.hours (gap-fill all hours) ───────┘
-        │ + cumulative window functions
-        ▼
-int_token_hourly_supply  ← date, blockchain, circulating_supply, ...
+        ▼ daily GROUP BY (view — no spine, no gap-fill)
+int_token_daily_net_change  ← day, blockchain, contract_address, mint_volume, burn_volume, net_change
         │
-        ▼ left join prices.hour + initcap(blockchain)
-fact_token_supply        ← + price, market_cap
+        ▼ cross join utils.days from min_block_time + left join net_changes + cumulative window functions
+fact_token_daily_supply  ← date, blockchain, contract_address, symbol, category, mint_volume, burn_volume, net_change, mint_volume_cumulative, burn_volume_cumulative, circulating_supply
 ```
 
 ### Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| `start_block` filter | Join condition `block_number >= l.start_block` | Skips pre-deployment blocks; improves scan performance |
-| `transfer_type` column | `'mint'` / `'burn'` in staging | Makes downstream aggregation readable with `CASE WHEN transfer_type = 'mint'` |
-| Gap-filling | `utils.hours` cross-joined with `min(date)` from `supplies` | Generates all hours from first transfer; no hardcoded start dates needed |
-| Cumulative columns | Window functions in intermediate | `mint_volume_cumulative`, `burn_volume_cumulative`, `circulating_supply` |
-| Prices isolated to mart | Left join `prices.hour` only in `fact_token_supply` | Swap price source by changing one CTE without touching supply logic |
-| Blockchain casing | `initcap(blockchain)` applied in mart after price join | Avoids casing mismatch on the `prices.hour` join |
+| `min_block_number` filter | Join condition `block_number >= l.min_block_number` | Skips pre-deployment blocks; improves scan performance |
+| `event_type` column | `'mint'` / `'burn'` in staging | Makes downstream aggregation readable with `CASE WHEN event_type = 'mint'` |
+| Gap-filling | `utils.days` cross-joined with `min_block_time` from `dim_labels` | Generates all days from deployment date; no hardcoded start dates needed |
+| Cumulative columns | Window functions in mart (`fact_token_daily_supply`) | `mint_volume_cumulative`, `burn_volume_cumulative`, `circulating_supply` — intermediate is a cheap view |
 | Burn address | Zero address only (`0x000...000`) | Matches working query exactly |
 
-### Open Questions
+### `fact_token_daily_supply` Schema
 
-| # | Question | Status |
-|---|----------|--------|
-| 1 | Should we add a `fact_token_holders` model (hourly unique holder count)? | ❓ Open |
-| 2 | If price data is sparse for some tokens/chains, should we forward-fill prices? | ❓ Open |
+| Column | Type | Description |
+|--------|------|-------------|
+| `date` | date | Calendar date (UTC) |
+| `blockchain` | varchar | Chain name, lowercase |
+| `contract_address` | varbinary | Token contract address |
+| `symbol` | varchar | Token symbol (from `dim_labels.name`) |
+| `category` | varchar | Asset category from `dim_labels` (e.g. `stablecoin`, `rwa`) |
+| `mint_volume` | double | Tokens minted on this day; NULL on gap-filled days with no activity |
+| `burn_volume` | double | Tokens burned on this day (positive figure); NULL on gap-filled days with no activity |
+| `net_change` | double | `mint_volume − burn_volume` on this day; NULL on gap-filled days |
+| `mint_volume_cumulative` | double | Cumulative mints from deployment to this day |
+| `burn_volume_cumulative` | double | Cumulative burns from deployment to this day |
+| `circulating_supply` | double | Running net supply = `mint_volume_cumulative − burn_volume_cumulative` |
+
+---
+
+## Token Holder Balance Pipeline
+
+Models that track the daily token balance per wallet for tokens in `dim_labels`.
+
+### Architecture
+
+All ERC-20/native transfers for whitelisted tokens are split into two signed rows per event (inflow / outflow), producing a wallet-level ledger. Daily net change is aggregated per wallet, then accumulated into a running balance over a gap-filled days spine anchored to the token's deployment date.
+
+### Model Inventory
+
+| Layer | Model | Alias | Materialization | Status | Notes |
+|-------|-------|-------|----------------|--------|-------|
+| Utils | `utils/tokens/dim_labels.sql` | `dim_labels` | `view` | ✅ | Token scope + `min_block_time` per chain (spine anchor) |
+| Staging | `staging/tokens/stg_token_holder_transfers.sql` | `stg_token_holder_transfers` | `incremental` (delete+insert) | ✅ | Two rows per transfer: inflow (wallet = to, amount +) and outflow (wallet = from, amount −). Zero address excluded as wallet. |
+| Intermediate | `intermediate/tokens/int_token_holder_daily_net_change.sql` | `int_token_holder_daily_net_change` | `view` | ✅ | Daily GROUP BY per (wallet, token) — no spine, no cumulative logic |
+| Mart | `marts/tokens/fact_token_holder_daily_balance.sql` | `fact_token_holder_daily_balance` | `table` | ✅ | Days spine + gap-fill + cumulative balance window; rows where `balance ≤ 0` excluded |
+
+### Lineage
+
+```
+dim_labels (min_block_time — spine anchor)
+        │
+        ▼ inner join + WHERE semi-join on (blockchain, contract_address)
+tokens.transfers (all transfers, not just mint/burn)
+        │
+        ▼ two rows per transfer: inflow (wallet = "to") and outflow (wallet = "from")
+stg_token_holder_transfers  [incremental, delete+insert, 3-day lookback]
+        │
+        ▼ daily GROUP BY per (blockchain, contract_address, wallet_address)
+int_token_holder_daily_net_change  [view]
+        │
+        ▼ cross join utils.days from min_block_time per (wallet, token) + cumulative window
+fact_token_holder_daily_balance  [table]
+```
+
+### `fact_token_holder_daily_balance` Schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `day` | date | Calendar date (UTC) |
+| `blockchain` | varchar | Chain name, lowercase |
+| `contract_address` | varbinary | Token contract address |
+| `wallet_address` | varbinary | Wallet holding the token |
+| `symbol` | varchar | Token symbol |
+| `category` | varchar | Asset category from dim_labels (e.g. `stablecoin`, `rwa`) |
+| `min_block_time` | timestamp | Token deployment timestamp (spine anchor) |
+| `net_change` | double | Net token flow into the wallet on this day; NULL on gap-filled days |
+| `balance` | double | Cumulative balance at end of day; rows where balance ≤ 0 are excluded |
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Include mint/burn transfers | Yes | Mints and burns change wallet balances; excluding them would make balances incorrect |
+| Zero address as wallet | Excluded in both UNION branches | Zero address is not a token holder |
+| Unique key | `(blockchain, tx_hash, evt_index, event_type)` | One transfer produces two rows; `event_type` differentiates them |
+| WHERE semi-join | `(blockchain, contract_address) IN (SELECT ...)` alongside INNER JOIN | Required Trino scan pushdown pattern (CLAUDE.md) |
+| Spine anchor | `min_block_time` from `dim_labels` per (blockchain, contract_address) | Uses token deployment date — consistent with the supply pipeline; avoids per-wallet MIN aggregation |
+| balance > 0 filter | Exclude rows where `balance ≤ 0` | Removes fully-exited wallets and rounding artefacts |
 
 ---
 
@@ -302,14 +483,9 @@ Track architectural decisions and open questions here. Once resolved, document t
 
 ---
 
-## Materialization Strategy (Draft)
+## Materialization Strategy
 
-| Layer | Default Materialization | Rationale |
-|-------|------------------------|-----------|
-| `utils/` | `view` | Small lookups, always fresh |
-| `staging/` | `incremental` (merge) | Large raw event tables, append-mostly |
-| `intermediate/` | `incremental` (merge) or `view` | Depends on query cost; default to view, promote to incremental when slow |
-| `marts/` | `incremental` (merge) | Production tables, must be performant |
+See CLAUDE.md → "Materialization Strategy" for the authoritative rules.
 
 ---
 
@@ -322,7 +498,7 @@ Sources (Dune delta_prod)
 staging/           ← Clean raw events per protocol
     │
     ▼
-utils/labels/      ← Token/address enrichment (joins in intermediate or marts)
+utils/tokens/      ← Token/address enrichment (joins in intermediate or marts)
     │
     ▼
 intermediate/      ← Cross-protocol unions, business logic

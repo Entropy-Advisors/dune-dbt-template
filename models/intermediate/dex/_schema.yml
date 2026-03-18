@@ -7,7 +7,7 @@ models:
       Aggregates all signed inflows and outflows from stg_dex_pool_token_transfers by day.
       This is a cheap GROUP BY view — no cumulative logic, no window functions.
       Fed by: `stg_dex_pool_token_transfers`.
-      Feeds: `fact_dex_pool_token_balance` (running balance with days spine).
+      Feeds: `fact_dex_pool_daily_token_balance` (running balance with days spine).
     columns:
       - name: blockchain
         tests:
@@ -31,7 +31,7 @@ models:
           - not_null
       - name: symbol
       - name: min_block_time
-        description: "Timestamp of pool creation. Passed through from int_dex_pool_created; anchors the days spine in fact_dex_pool_token_balance — spine starts at creation, not first transfer."
+        description: "Timestamp of pool creation. Passed through from int_dex_pool_created; anchors the days spine in fact_dex_pool_daily_token_balance — spine starts at creation, not first transfer."
         tests:
           - not_null
       - name: net_change
@@ -46,26 +46,28 @@ models:
       Union of all DEX pool creation events across all tracked protocols and versions.
       Each row represents a single pool creation (or initialization) event.
 
-      Fed by (14 staging models — one UNION ALL branch each):
+      Fed by (one UNION ALL branch per staging model):
         stg_uniswap_v2_pool_created, stg_uniswap_v3_pool_created, stg_uniswap_v4_pool_initialized,
         stg_sushiswap_v2_pool_created, stg_sushiswap_v3_pool_created,
         stg_pancakeswap_v2_pool_created, stg_pancakeswap_v3_pool_created,
         stg_gammaswap_pool_created, stg_camelot_v2_pool_created, stg_camelot_v3_pool_created,
         stg_curve_twocrypto_ng_pool_created, stg_curve_tricrypto_ng_pool_created,
-        stg_curve_stableswap_ng_pool_created, stg_curve_stableswap_legacy_pool_created.
+        stg_curve_stableswap_ng_pool_created, stg_curve_stableswap_legacy_pool_created,
+        stg_balancer_v2_pool_created, stg_balancer_v3_pool_created.
       Feeds: `stg_dex_pool_token_transfers` (pool address whitelist and min_block_time),
         `int_dex_pool_daily_net_change` (via stg_dex_pool_token_transfers).
 
       Protocol coverage: Uniswap V2/V3/V4, SushiSwap V2/V3, PancakeSwap V2/V3,
       GammaSwap (DeltaSwap), Camelot V2/V3, Curve StableSwap Legacy, Curve StableSwap NG,
-      Curve TwoCrypto NG, Curve Tricrypto NG.
+      Curve TwoCrypto NG, Curve Tricrypto NG, Balancer V2, Balancer V3.
 
       Column notes:
         - fee / tick_spacing: NULL for V2-style protocols and Camelot V3 (Algebra dynamic fees).
         - hooks / sqrt_price_x96 / tick: Non-NULL for Uniswap V4 only.
         - token2-token7: NULL for all 2-token protocols. token2 always non-null for tricrypto_ng.
           token2/token3 present for stableswap_legacy (up to 4 coins). token2-token7 present for
-          stableswap_ng (up to 8 coins, cardinality-guarded).
+          stableswap_ng (up to 8 coins, cardinality-guarded). token2-token7 present for Balancer
+          V2/V3 (up to 8 tokens, cardinality-guarded).
         - pool: For all protocols except Uniswap V4, this is the pool contract address (varbinary).
           For Uniswap V4, this is the PoolId (bytes32 hash of the pool key) — not a contract address.
           Multiple V4 pools can share the same token pair, differentiated by fee/hooks/tick_spacing.
@@ -84,7 +86,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['uniswap', 'sushiswap', 'pancakeswap', 'gammaswap', 'camelot', 'curve']
+                values: ['uniswap', 'sushiswap', 'pancakeswap', 'gammaswap', 'camelot', 'curve', 'balancer']
       - name: version
         tests:
           - not_null
@@ -120,17 +122,17 @@ models:
         tests:
           - not_null
       - name: token2
-        description: "Third token. Non-null for tricrypto_ng (always 3 coins), stableswap_legacy (when 3+ coins), and stableswap_ng (when 3+ coins). NULL for all 2-token protocols."
+        description: "Third token. Non-null for tricrypto_ng (always 3 coins), stableswap_legacy (when 3+ coins), stableswap_ng (when 3+ coins), and Balancer V2/V3 (when 3+ tokens). NULL for all 2-token protocols."
       - name: token3
-        description: "Fourth token. Non-null for stableswap_legacy (when 4 coins) and stableswap_ng (when 4+ coins). NULL for all other protocols."
+        description: "Fourth token. Non-null for stableswap_legacy (when 4 coins), stableswap_ng (when 4+ coins), and Balancer V2/V3 (when 4+ tokens). NULL for all other protocols."
       - name: token4
-        description: "Fifth token. Non-null for stableswap_ng only (when 5+ coins). NULL for all other protocols."
+        description: "Fifth token. Non-null for stableswap_ng (when 5+ coins) and Balancer V2/V3 (when 5+ tokens). NULL for all other protocols."
       - name: token5
-        description: "Sixth token. Non-null for stableswap_ng only (when 6+ coins). NULL for all other protocols."
+        description: "Sixth token. Non-null for stableswap_ng (when 6+ coins) and Balancer V2/V3 (when 6+ tokens). NULL for all other protocols."
       - name: token6
-        description: "Seventh token. Non-null for stableswap_ng only (when 7+ coins). NULL for all other protocols."
+        description: "Seventh token. Non-null for stableswap_ng (when 7+ coins) and Balancer V2/V3 (when 7+ tokens). NULL for all other protocols."
       - name: token7
-        description: "Eighth token. Non-null for stableswap_ng only (when 8 coins). NULL for all other protocols."
+        description: "Eighth token. Non-null for stableswap_ng (when 8 coins) and Balancer V2/V3 (when 8 tokens). NULL for all other protocols."
       - name: fee
         description: "Fee tier in hundredths of a bip (e.g. 3000 = 0.3%). NULL for V2 and Camelot V3."
       - name: tick_spacing

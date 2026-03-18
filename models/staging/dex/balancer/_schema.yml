@@ -1,0 +1,188 @@
+version: 2
+
+models:
+  - name: stg_balancer_v2_pool_created
+    description: >
+      Full-decode bronze layer. All TokensRegistered ABI fields decoded and output.
+      Balancer V2 pools can contain 2–8 tokens (weighted, stable, or boosted).
+      The pool address is derived from the poolId: first 20 bytes of the bytes32 poolId (Balancer V2 encoding).
+      No creation_traces join needed — pool address is embedded in the indexed poolId topic.
+      One row per TokensRegistered event. No aggregation.
+      Factory addresses sourced from dim_dex_factory_addresses.sql (protocol='balancer', version='2').
+      One Vault address (0xBA12222222228d8Ba445958a75a0704d566BF2C8) is shared across all supported chains.
+      Some chains have null min_block_number — guarded with IS NULL check in the join.
+      Partitioned by blockchain and block_date.
+      topic0: 0xf5847d3f2197b16cdcd2098ec95d0905cd1abdaf415f07bb7cef2bba8ac5dec4
+      Event: TokensRegistered(bytes32 indexed poolId, address[] tokens, address[] assetManagers)
+      Feeds into: int_dex_pool_created (UNION ALL branch) and serves as the pool address
+      whitelist for stg_dex_pool_token_transfers.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. ethereum, arbitrum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Balancer V2 Vault contract address that emitted the TokensRegistered event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'balancer'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['balancer']
+      - name: version
+        description: "Always '2'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['2']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool creation"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool creation transaction"
+      - name: pool
+        description: "Pool contract address — first 20 bytes of poolId (Balancer V2 poolId encoding)"
+        tests:
+          - not_null
+      - name: pool_id
+        description: "Raw bytes32 poolId as emitted in the event (pool address || pool specialization || nonce)"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token (extracted from tokens[1], Trino 1-based)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token (extracted from tokens[2], Trino 1-based)"
+        tests:
+          - not_null
+      - name: token2
+        description: "Third token (extracted from tokens[3] if cardinality >= 3, else null)"
+      - name: token3
+        description: "Fourth token (extracted from tokens[4] if cardinality >= 4, else null)"
+      - name: token4
+        description: "Fifth token (extracted from tokens[5] if cardinality >= 5, else null)"
+      - name: token5
+        description: "Sixth token (extracted from tokens[6] if cardinality >= 6, else null)"
+      - name: token6
+        description: "Seventh token (extracted from tokens[7] if cardinality >= 7, else null)"
+      - name: token7
+        description: "Eighth token (extracted from tokens[8] if cardinality >= 8, else null). Balancer V2 supports up to 8 tokens."
+      - name: tokens
+        description: "Raw dynamic address[] array of all pool token addresses as decoded from the ABI (2–8 elements)"
+      - name: asset_managers
+        description: "Raw address[] array of asset manager addresses (one per token). Asset managers can move tokens to yield protocols."
+
+  - name: stg_balancer_v3_pool_created
+    description: >
+      Full-decode bronze layer. All PoolRegistered ABI fields decoded and output.
+      Balancer V3 pools can contain 2–8 tokens. The pool address is an indexed topic (topic1) —
+      directly decoded from the event. No creation_traces join needed.
+      One row per PoolRegistered event. No aggregation.
+      Factory addresses sourced from dim_dex_factory_addresses.sql (protocol='balancer', version='3').
+      One Vault address (0xbA1333333333a1BA1108E8412f11850A5C319bA9) is shared across all supported chains.
+      All chains have null min_block_number — guarded with IS NULL check in the join.
+      Partitioned by blockchain and block_date.
+      topic0: 0xbc1561eeab9f40962e2fb827a7ff9c7cdb47a9d7c84caeefa4ed90e043842dad
+      Event: PoolRegistered(address indexed pool, address indexed factory, TokenConfig[] tokenConfig,
+        uint256 swapFeePercentage, uint32 pauseWindowEndTime, PoolRoleAccounts roleAccounts,
+        HooksConfig hooksConfig, LiquidityManagement liquidityManagement)
+      TokenConfig = (address token, uint8 tokenType, address rateProvider, bool paysYieldFees)
+      Feeds into: int_dex_pool_created (UNION ALL branch) and serves as the pool address
+      whitelist for stg_dex_pool_token_transfers.
+    columns:
+      - name: blockchain
+        description: "Chain the pool was deployed on (e.g. ethereum, arbitrum, base)"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Balancer V3 Vault contract address that emitted the PoolRegistered event"
+        tests:
+          - not_null
+      - name: protocol
+        description: "Always 'balancer'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['balancer']
+      - name: version
+        description: "Always '3'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['3']
+      - name: block_date
+        description: "Partition column — date of the block"
+        tests:
+          - not_null
+      - name: block_time
+        description: "Timestamp of the block"
+        tests:
+          - not_null
+      - name: block_number
+        tests:
+          - not_null
+      - name: tx_hash
+        description: "Transaction hash of the pool registration"
+        tests:
+          - not_null
+      - name: tx_from
+        description: "Address that submitted the pool registration transaction"
+      - name: pool
+        description: "Pool contract address (indexed topic1)"
+        tests:
+          - not_null
+      - name: factory
+        description: "Factory contract address that registered the pool (indexed topic2)"
+        tests:
+          - not_null
+      - name: token0
+        description: "First token (extracted from tokenConfig[1].token, Trino 1-based)"
+        tests:
+          - not_null
+      - name: token1
+        description: "Second token (extracted from tokenConfig[2].token, Trino 1-based)"
+        tests:
+          - not_null
+      - name: token2
+        description: "Third token (extracted from tokenConfig[3].token if cardinality >= 3, else null)"
+      - name: token3
+        description: "Fourth token (extracted from tokenConfig[4].token if cardinality >= 4, else null)"
+      - name: token4
+        description: "Fifth token (extracted from tokenConfig[5].token if cardinality >= 5, else null)"
+      - name: token5
+        description: "Sixth token (extracted from tokenConfig[6].token if cardinality >= 6, else null)"
+      - name: token6
+        description: "Seventh token (extracted from tokenConfig[7].token if cardinality >= 7, else null)"
+      - name: token7
+        description: "Eighth token (extracted from tokenConfig[8].token if cardinality >= 8, else null). Balancer V3 supports up to 8 tokens."
+      - name: token_config
+        description: "Raw decoded tuple[] of TokenConfig structs — (token address, tokenType enum, rateProvider address, paysYieldFees bool)"
+      - name: swap_fee_percentage
+        description: "Pool's static swap fee percentage (uint256, 18-decimal fixed point, e.g. 1e15 = 0.1%)"
+      - name: pause_window_end_time
+        description: "Unix timestamp (uint32) after which the pool cannot be paused"
+      - name: role_accounts
+        description: "Decoded PoolRoleAccounts struct — (pauseManager, swapFeeManager, poolCreator)"
+      - name: hooks_config
+        description: "Decoded HooksConfig struct — 10 boolean flags plus hooksContract address"
+      - name: liquidity_management
+        description: "Decoded LiquidityManagement struct — (disableUnbalancedLiquidity, enableAddLiquidityCustom, enableRemoveLiquidityCustom, enableDonation)"

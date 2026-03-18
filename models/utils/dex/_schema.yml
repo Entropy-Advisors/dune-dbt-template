@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: dim_dex_factory_addresses
+    description: >
+      Single source of truth for all DEX factory and PoolManager contract addresses.
+      Each row registers one deployed contract on one chain for one protocol version.
+
+      Fed by: no upstream dbt models — rows are maintained directly in this file.
+      Feeds: all pool creation staging models (stg_*_pool_created / stg_*_pool_initialized)
+        via a tuple IN join for Trino partition/row-group pruning.
+
+      Update paths:
+        - Agent-driven: run a jobs/refresh_*.md job to add new rows directly.
+        - Bulk import: scripts/sync_factory_addresses.py reads from a Google Sheet.
+
+      Protocol coverage (see SQL file for current chain list per protocol):
+        Uniswap V2/V3/V4, SushiSwap V2/V3, PancakeSwap V2/V3, GammaSwap (DeltaSwap),
+        Camelot V2/V3, Curve StableSwap Legacy/NG, TwoCrypto NG, Tricrypto NG, Balancer V2/V3.
+
+      V4 distinction: Uniswap V4 uses a PoolManager contract per chain rather than a factory.
+      Staging models use the CTE name `pool_manager_addresses` (not `factory_addresses`) when
+      filtering V4 events.
+
+      Staging models filter with a tuple IN join to ensure correct (blockchain, contract_address)
+      pairing — two separate INs would allow any blockchain paired with any address, which is incorrect:
+        and (l.blockchain, l.contract_address) in (select blockchain, contract_address from factory_addresses)
+    columns:
+      - name: protocol
+        description: "DEX protocol name in lowercase (e.g. 'uniswap', 'curve', 'balancer')"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['uniswap', 'sushiswap', 'pancakeswap', 'gammaswap', 'camelot', 'curve', 'balancer']
+      - name: version
+        description: "Protocol version string (e.g. '2', '3', '4', 'deltaswap')"
+        tests:
+          - not_null
+      - name: blockchain
+        description: "Dune chain name in lowercase (e.g. 'ethereum', 'arbitrum', 'base', 'zksync', 'opbnb', 'katana')"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Factory contract address (V2/V3) or PoolManager address (V4). Stored as varbinary literal — no casting needed in joins."
+        tests:
+          - not_null
+      - name: min_block_number
+        description: "Deployment block number for this contract. Staging models use this to narrow partition scans. NULL is allowed when the exact deployment block is not yet confirmed — the staging join guards with (min_block_number IS NULL OR block_number >= min_block_number)."
