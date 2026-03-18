@@ -16,3 +16,6 @@ sources:
     tables:
       - name: logs
       - name: creation_traces
+  - name: morpho_blue_multichain
+    tables:
+      - name: morphoblue_evt_createmarket

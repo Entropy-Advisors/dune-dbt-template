@@ -1,28 +1,47 @@
 version: 2
 
 models:
-  - name: stg_token_mint_burn_events
+  - name: stg_token_mint_burn_events_view
     description: >
-      Raw mint and burn transfer events for tokens whitelisted in `dim_labels` (type = 'token').
-      One row per transfer event. No aggregation.
-
-      Fed by: `tokens.transfers` (source) filtered via inner join + WHERE subquery on `dim_labels`.
-      Feeds into: `int_token_daily_net_change`.
-
-      Token whitelist: `dim_labels` (type = 'token') drives which tokens and chains are included.
-      To add a token or chain: add a row to `dim_labels` — no SQL changes needed here.
-
-      Filtered to post-deployment blocks using `min_block_number` from `dim_labels` to skip
-      pre-deployment history. `category` is pulled from `dim_labels` at this layer.
-
-      Signed amount convention: all three amount fields (amount_raw, amount, amount_usd) are signed —
-      positive for mints, negative for burns. Both staging models sign all three amount fields;
-      see CLAUDE.md → "Signed amount convention".
+      View copy of stg_token_mint_burn_events. Same logic without incremental config.
+      Used by int_token_hourly_supply and downstream models.
     columns:
+      - name: block_time
       - name: blockchain
         description: "Chain name in lowercase (e.g. 'arbitrum', 'base', 'plasma')"
         tests:
           - not_null
+      - name: contract_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: category
+      - name: amount
+        description: "Decimal-adjusted token amount from tokens.transfers"
+      - name: transfer_type
+        description: "'mint' (from = 0x0) or 'burn' (to = 0x0)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['mint', 'burn']
+  - name: stg_token_mint_burn_events
+    description: >
+      Raw mint and burn transfer events for tokens in dim_labels (type = 'token').
+      One row per transfer. No aggregation.
+      Filtered to post-deployment blocks via start_block from dim_labels.
+      Partitioned by blockchain and block_time.
+    columns:
+      - name: block_time
+      - name: blockchain
+        tests:
+          - not_null
+      - name: contract_address
+        tests:
+          - not_null
+      - name: symbol
+      - name: category
+      - name: amount
+        description: "Decimal-adjusted token amount from tokens.transfers"
       - name: event_type
         description: "'mint' (from = 0x0) or 'burn' (to = 0x0)"
         tests:

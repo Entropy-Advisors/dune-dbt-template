@@ -3,16 +3,10 @@ version: 2
 models:
   - name: fact_token_daily_supply
     description: >
-      Daily circulating supply per token per chain.
-      All days from deployment onward are gap-filled — quiet days appear with NULL
-      mint/burn/net_change but carry forward cumulative and supply values.
-
-      Fed by: `int_token_daily_net_change` (daily activity), `dim_labels` (spine anchor).
-
-      Owns the daily spine (utils.days × dim_labels), gap-fill, and cumulative window functions.
-      This is where the expensive logic lives — the intermediate is a cheap GROUP BY view.
-
-      Price join deferred — add when a prices source is available.
+      Hourly circulating supply and market cap per token per chain.
+      All hours from first transfer onward are filled via utils.hours cross join.
+      Prices joined from prices.hour on (timestamp, blockchain, contract_address).
+      Blockchain names are title-cased via initcap().
     columns:
       - name: date
         description: "Day-truncated date"
@@ -21,8 +15,8 @@ models:
       - name: contract_address
         description: "Token contract address"
       - name: symbol
-      - name: category
-        description: "Asset category from dim_labels (e.g. 'stablecoin', 'ybs', 'rwa')"
+      - name: price
+        description: "Token price in USD from prices.hour"
       - name: mint_volume
         description: "Tokens minted on this day (NULL for quiet days)"
       - name: burn_volume

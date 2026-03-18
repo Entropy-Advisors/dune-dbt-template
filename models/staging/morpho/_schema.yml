@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: dim_morpho_markets
+    description: >
+      One row per Morpho Blue market creation event across all supported chains.
+      Contains market parameters including loan token, collateral token, oracle,
+      interest rate model, and loan-to-value ratio.
+    columns:
+      - name: blockchain
+        description: "Chain where the market was created"
+        tests:
+          - not_null
+      - name: contract_address
+        description: "Morpho Blue contract address"
+        tests:
+          - not_null
+      - name: evt_tx_hash
+        description: "Transaction hash of the market creation event"
+        tests:
+          - not_null
+      - name: evt_tx_from
+        description: "Address that sent the market creation transaction"
+      - name: evt_tx_to
+        description: "Contract address the transaction was sent to"
+      - name: evt_block_time
+        description: "Timestamp of the block containing the market creation"
+      - name: evt_block_number
+        description: "Block number of the market creation event"
+      - name: evt_block_date
+        description: "Date of the block containing the market creation"
+      - name: id
+        description: "Unique market ID"
+        tests:
+          - not_null
+      - name: borrow_token
+        description: "Address of the loan/borrow token"
+      - name: collateral_token
+        description: "Address of the collateral token"
+      - name: oracle
+        description: "Address of the price oracle used by this market"
+      - name: irm_address
+        description: "Address of the interest rate model (IRM)"
+      - name: ltv
+        description: "Loan-to-value ratio (LLTV), decimal-adjusted from 1e18"
