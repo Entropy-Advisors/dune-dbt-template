@@ -17,6 +17,22 @@
 
 with
 
+-- Daily net changes per (blockchain, pool, token).
+daily_net_change as (
+    select
+    day,
+    blockchain,
+    pool,
+    protocol,
+    version,
+    token_address,
+    symbol,
+    sum(net_change)                 as net_change
+    -- sum(net_change_usd)          as net_change_usd  -- uncomment to include USD balance
+    from {{ ref('int_dex_pool_daily_net_change') }}
+    group by 1, 2, 3, 4, 5, 6, 7
+),
+
 -- Distinct (blockchain, pool, token) combinations and their earliest observed day.
 -- Used to anchor the days spine per entity — avoids generating rows before any transfers existed.
 pool_tokens as (
@@ -28,7 +44,7 @@ pool_tokens as (
         token_address,
         symbol,
         min_block_time
-    from {{ ref('int_dex_pool_daily_net_change') }}
+    from daily_net_change
 ),
 
 -- Gap-filled calendar: one row per (pool, token, day) from first transfer to today.
@@ -44,22 +60,6 @@ index as (
     from {{ source('utils', 'days') }} as d
     cross join pool_tokens as pt
     where d.timestamp >= pt.min_block_time
-),
-
--- Join net changes onto the gap-filled index (NULL for days with no transfers).
-daily_net_change as (
-    select
-    day,
-    blockchain,
-    pool,
-    protocol,
-    version,
-    token_address,
-    symbol,
-    sum(net_change)                 as net_change
-    -- sum(net_change_usd)          as net_change_usd  -- uncomment to include USD balance
-    from {{ ref('int_dex_pool_daily_net_change') }}
-    group by 1, 2, 3, 4, 5, 6, 7
 ),
 
 with_index as (

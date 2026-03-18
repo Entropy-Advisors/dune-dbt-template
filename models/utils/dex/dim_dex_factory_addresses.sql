@@ -239,11 +239,11 @@ from (
         ('balancer', '2', 'fraxtal',     0xBA12222222228d8Ba445958a75a0704d566BF2C8, null),
 
         -- Balancer V3 (Vault — same address on all chains, deployed Dec 2024)
-        ('balancer', '3', 'ethereum',    0xbA1333333333a1BA1108E8412f11850A5C319bA9, null),
-        ('balancer', '3', 'gnosis',      0xbA1333333333a1BA1108E8412f11850A5C319bA9, null),
-        ('balancer', '3', 'arbitrum',    0xbA1333333333a1BA1108E8412f11850A5C319bA9, null),
-        ('balancer', '3', 'base',        0xbA1333333333a1BA1108E8412f11850A5C319bA9, null),
-        ('balancer', '3', 'optimism',    0xbA1333333333a1BA1108E8412f11850A5C319bA9, null),
-        ('balancer', '3', 'avalanche_c', 0xbA1333333333a1BA1108E8412f11850A5C319bA9, null)
+        ('balancer', '3', 'ethereum',    0xbA1333333333a1BA1108E8412f11850A5C319bA9, 21336938),
+        ('balancer', '3', 'gnosis',      0xbA1333333333a1BA1108E8412f11850A5C319bA9, 37371696),
+        ('balancer', '3', 'arbitrum',    0xbA1333333333a1BA1108E8412f11850A5C319bA9, 297829457),
+        ('balancer', '3', 'base',        0xbA1333333333a1BA1108E8412f11850A5C319bA9, 25347332),
+        ('balancer', '3', 'optimism',    0xbA1333333333a1BA1108E8412f11850A5C319bA9, 133969652),
+        ('balancer', '3', 'avalanche_c', 0xbA1333333333a1BA1108E8412f11850A5C319bA9, 59965831)
 
 ) as t(protocol, version, blockchain, contract_address, min_block_number)
